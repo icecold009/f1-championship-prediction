@@ -1,0 +1,18 @@
+# Force LF for all text files
+* text=auto eol=lf
+
+# Explicitly LF for these
+*.py    text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf
+*.csv   text eol=lf
+*.json  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.ipynb text eol=lf
+
+# Binary - no line ending conversion
+*.pkl   binary
+*.png   binary
+*.jpg   binary
+*.zip   binary
