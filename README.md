@@ -20,6 +20,26 @@ This project focuses on:
   - Predict **final position / tier** (e.g. champion, podium contender, midfield, backmarker)
 - Evaluating how well we can **reconstruct the final standings** of a season using only historic season data up to that point.
 
+## Quickstart
+
+```bash
+# 1. Clone and install
+git clone https://github.com/icecold009/f1-championship-prediction.git
+cd f1-championship-prediction
+pip install -r requirements.txt
+
+# 2. Process data
+python SRC/data_processing.py
+
+# 3. Train models
+python SRC/model.py
+
+# 4. Generate predictions
+python SRC/predict.py
+```
+
+Predictions are saved to `Results/predictions.csv`.
+
 ## Problem Framing
 
 There are two main prediction tasks:
