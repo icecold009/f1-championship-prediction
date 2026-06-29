@@ -5,9 +5,7 @@ A data science project where I use historical Formula 1 race data to **predict t
 
 The goal is to explore how well machine learning models can approximate the final rankings using data like race results, qualifying performance, team strength, and driver consistency.
 
----
-
-## 📌 Project Overview
+## Project Overview
 
 This project focuses on:
 
@@ -22,9 +20,7 @@ This project focuses on:
   - Predict **final position / tier** (e.g. champion, podium contender, midfield, backmarker)
 - Evaluating how well we can **reconstruct the final standings** of a season using only historic season data up to that point.
 
----
-
-## 🧠 Problem Framing
+## Problem Framing
 
 There are two main prediction tasks:
 
@@ -41,9 +37,7 @@ There are two main prediction tasks:
 
 The final output is a **predicted ordered list of drivers**, which can be compared to the actual final standings.
 
----
-
-## 📂 Data
+## Data
 
 The dataset includes (per season and per driver):
 
@@ -67,9 +61,7 @@ Typical sources:
 - Ergast API exports  
 - Manually cleaned CSV files in the `data/` folder  
 
----
-
-## 🧱 Features & Approach
+## Features & Approach
 
 Key feature engineering ideas:
 
@@ -96,24 +88,33 @@ Key feature engineering ideas:
 - Seasons in F1  
 - Total career points (up to that year)  
 
+## Model Results
+
+All models trained on 80% of seasons, tested on 20% holdout. 
+Ranking quality measured with Spearman correlation (higher = better predicted order).
+
+| Model | CV RMSE | R² | Spearman ρ |
+|---|---|---|---|
+| Ridge Regression | 10.395 | 0.769 | 0.898 |
+| Random Forest Regressor | 8.789 | 0.847 | 0.951 |
+| Gradient Boosting Regressor | 8.975 | 0.854 | **0.949** ← best |
+
+**Best model:** Gradient Boosting (or whichever wins) — selected by highest Spearman ρ.
+
+**Tier Classifier (Random Forest):** CV Accuracy 8.975 | Test Accuracy 0.951
+
 ---
 
-## 🧮 Models Used
+## Feature Importance (Best Model)
 
-This project experiments with multiple models (using scikit-learn):
+| Rank | Feature | Importance |
+|---|---|---|
+| 1 | points_sum | 0.266095 |
+| 2 | avg_finish_pos | 0.173354 |
+| 3 | points_per_race | 0.247010 |
+| ... | ... | ... |
 
-- **Regression**
-  - Linear Regression / Ridge Regression  
-  - Random Forest Regressor  
-  - Gradient Boosting / XGBoost (optional)  
-
-- **Classification (tiers / buckets)**
-  - Logistic Regression  
-  - Random Forest Classifier  
-
----
-
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Language:** Python 3.x  
 - **Data:** CSV files (`pandas` DataFrames)  
