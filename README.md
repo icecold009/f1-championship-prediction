@@ -1,7 +1,7 @@
 # f1-championship-prediction
 # Predicting F1 Championship Final Standings 🏎️📊
 
-A data science project where I use historical Formula 1 race data to **predict the final Drivers’ Championship standings** for a season.
+A data science project where I use historical Formula 1 race data to **forecast the final Drivers’ Championship standings** for a season.
 
 The goal is to explore how well machine learning models can approximate the final rankings using data like race results, qualifying performance, team strength, and driver consistency.
 
@@ -10,15 +10,11 @@ The goal is to explore how well machine learning models can approximate the fina
 This project focuses on:
 
 - Collecting and cleaning **historical F1 data** (drivers, constructors, races, results)
-- Engineering features that represent:
-  - Driver performance across races  
-  - Team/constructor strength  
-  - Qualifying vs race pace  
-  - Reliability (DNFs, DNS, etc.)
+- Engineering features that represent prior-season driver performance, constructor strength, qualifying pace, and reliability
 - Training machine learning models to:
   - Predict **final points**
   - Predict **final position / tier** (e.g. champion, podium contender, midfield, backmarker)
-- Evaluating how well we can **reconstruct the final standings** of a season using only historic season data up to that point.
+- Evaluating how well we can **forecast a season's final standings** without using that season's race outcomes as predictors.
 
 ## Quickstart
 
@@ -28,17 +24,35 @@ git clone https://github.com/icecold009/f1-championship-prediction.git
 cd f1-championship-prediction
 pip install -r requirements.txt
 
-# 2. Process data
-python SRC/data_processing.py
+# 2. Download the raw CSV inputs (kept out of Git)
+python scripts/download_data.py
 
-# 3. Train models
-python SRC/model.py
+# 3. Run processing, training, prediction, visualisation, and HTML report
+python main.py --year 2023 --report
 
-# 4. Generate predictions
-python SRC/predict.py
+# 4. Re-run the auditable rolling-origin evaluation independently
+python scripts/evaluate.py
 ```
 
-Predictions are saved to `Results/predictions.csv`.
+Predictions are saved to `results/2023_predictions.csv`; the chart and user-facing report are saved to
+`results/predicted_vs_actual_2023.png` and `results/f1_prediction_report_2023.html`. Processed data
+and result files are regenerated locally and ignored by Git. The evaluation command writes summary
+and per-season detail CSVs under `results/`. See [MODEL_CARD.md](MODEL_CARD.md) for intended use,
+limitations, and the evaluation protocol.
+
+For a validated release bundle with provenance metadata, run
+`python scripts/build_release.py --download --year 2023`. See [RELEASE.md](RELEASE.md) for the
+local checklist and the manual GitHub Actions artifact workflow.
+
+## Tests
+
+Run the unit tests locally with:
+
+```bash
+python -m pytest -q
+```
+
+The same test command runs in GitHub Actions for Python 3.12 and 3.13.
 
 ## Problem Framing
 
@@ -68,60 +82,89 @@ The dataset includes (per season and per driver):
   - Points scored  
   - Grid position  
   - DNFs / DNS  
-- Season-level aggregates:
+- Historical season-level aggregates:
   - Total races started  
   - Average finish position  
   - Average grid position  
   - Points per race  
   - Podiums, wins, poles, fastest laps  
 
-Typical sources:
+The raw CSVs are downloaded from the public [Formula 1 Race Data Kaggle dataset](https://www.kaggle.com/datasets/jtrotman/formula-1-race-data), which uses the Ergast-compatible table layout expected by this project. The local snapshot used for the reported results was pulled on **2025-01-29**, contains seasons through **2024**, and is refreshed with `python scripts/download_data.py`. Ergast’s public API was retired after the 2024 season; the linked Kaggle dataset preserves the compatible table structure while providing an auditable source for this snapshot.
 
-- Public F1 datasets (CSV)  
-- Ergast API exports  
-- Manually cleaned CSV files in the `data/` folder  
+The project uses this dataset as its raw-data source; the local `data/raw/` files are generated inputs and are intentionally not tracked.
 
 ## Features & Approach
 
-Key feature engineering ideas:
+Key feature engineering ideas. All predictors are available before the target
+season's championship outcome is known:
 
 ### Performance metrics
 
-- Average finish position  
-- Average grid position  
-- Delta between grid and finish (racecraft)  
-- Win / podium / points-scoring rate  
+- Prior-season average finish position
+- Prior-season average grid position
+- Prior-season grid-to-finish delta (racecraft)
+- Prior-season win / podium / points-scoring rates
 
 ### Reliability
 
-- Number and percentage of DNFs  
-- Races started vs races in season  
+- Prior-season number and percentage of DNFs
+- Prior-season races started
 
 ### Team strength
 
-- Total constructor points  
-- Team average finish position  
-- Team average qualifying position  
+- Prior constructor championship points
+- Prior constructor championship position
 
-### Experience
-
-- Seasons in F1  
-- Total career points (up to that year)  
+The current season's race results are not used as predictors. The season-opening
+constructor is used to join its prior final championship strength, while the
+final driver standings are retained only as evaluation targets.
 
 ## Model Results
 
-All models trained on 80% of seasons, tested on 20% holdout. 
+Models trained on seasons 1950–2019 and evaluated on the latest five seasons (2020–2024).
+Each forecast row uses the driver's prior-season statistics and the prior final standings of the constructor they enter with. Same-season race results are used only to identify entrants and construct the final target, not as model inputs. Cross-validation groups rows by season to avoid leakage across seasons.
 Ranking quality measured with Spearman correlation (higher = better predicted order).
+
+### Rolling-origin backtest
+
+Each regressor was retrained before each test season from **2015–2024**, using
+only seasons earlier than that test season. Values below are the mean and
+standard deviation across the ten chronological test seasons.
+
+| Model / baseline | Mean RMSE | RMSE SD | Mean Spearman | Spearman SD |
+|---|---:|---:|---:|---:|
+| Baseline: previous points rank | 3.758 | 0.747 | 0.821 | 0.081 |
+| Random Forest | 6.657 | 2.818 | 0.808 | 0.061 |
+| Gradient Boosting | 6.888 | 2.747 | 0.788 | 0.057 |
+| Baseline: previous avg finish | 4.564 | 0.875 | 0.783 | 0.085 |
+| Ridge | 11.921 | 2.317 | 0.686 | 0.102 |
+
+In this evaluation snapshot, the previous-season points-rank baseline outperforms
+the ML regressors. That is a useful result: future model changes must beat this
+reference before they can be described as adding predictive value.
+
+The fixed 2020–2024 holdout below is retained as the headline comparison;
+the rolling-origin results show how stable performance is across multiple
+forecast cutoffs rather than relying on one test window.
 
 | Model | CV RMSE | R² | Spearman ρ |
 |---|---|---|---|
-| Ridge Regression | 10.395 | 0.769 | 0.898 |
-| Random Forest Regressor | 8.789 | 0.847 | 0.951 |
-| Gradient Boosting Regressor | 8.975 | 0.854 | **0.949** ← best |
+| Ridge Regression | 17.410 | -1.789 | 0.699 |
+| Random Forest Regressor | 16.828 | 0.236 | 0.832 |
+| Gradient Boosting Regressor | 17.404 | 0.152 | 0.776 |
 
-**Best model:** Gradient Boosting (or whichever wins) — selected by highest Spearman ρ.
+**Best model:** Random Forest — selected by highest Spearman ρ (0.832).
 
-**Tier Classifier (Random Forest):** CV Accuracy 8.975 | Test Accuracy 0.951
+**Tier Classifier (Random Forest):** Stratified Grouped CV Accuracy 0.707 | Test Accuracy 0.518 | Test Macro F1 0.461
+
+| Tier | Test F1 |
+|---|---:|
+| Champion | 0.667 |
+| Podium | 0.471 |
+| Top 5 | 0.125 |
+| Top 10 | 0.515 |
+| Midfield | 0.256 |
+| Backmarker | 0.730 |
 
 ---
 
@@ -129,10 +172,16 @@ Ranking quality measured with Spearman correlation (higher = better predicted or
 
 | Rank | Feature | Importance |
 |---|---|---|
-| 1 | points_sum | 0.266095 |
-| 2 | avg_finish_pos | 0.173354 |
-| 3 | points_per_race | 0.247010 |
-| ... | ... | ... |
+| 1 | prev_season_races_started | 0.504747 |
+| 2 | prev_team_final_position | 0.132477 |
+| 3 | prev_season_avg_grid_pos | 0.074579 |
+| 4 | prev_season_avg_finish_pos | 0.056302 |
+| 5 | prev_season_quali_to_race_delta | 0.056148 |
+| 6 | prev_team_final_points | 0.052832 |
+| 7 | prev_season_points_sum | 0.050951 |
+| 8 | prev_season_std_finish_pos | 0.032967 |
+| 9 | prev_season_points_per_race | 0.018516 |
+| 10 | prev_season_dnf_rate | 0.013810 |
 
 ## Tech Stack
 
@@ -142,4 +191,3 @@ Ranking quality measured with Spearman correlation (higher = better predicted or
   - `pandas`, `numpy`  
   - `scikit-learn`  
   - `matplotlib`, `seaborn` (visualization)  
-  - `xgboost` (optional, if used)  
