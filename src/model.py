@@ -1,5 +1,8 @@
+import logging
 import os
 import pickle
+from typing import Iterable
+
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
@@ -7,6 +10,8 @@ from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, Grad
 from sklearn.linear_model import Ridge
 from sklearn.model_selection import GroupKFold, cross_val_score
 from sklearn.metrics import classification_report, mean_squared_error, r2_score
+
+logger = logging.getLogger(__name__)
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 BASE_DIR  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -35,7 +40,8 @@ FEATURE_COLUMNS = [
 
 TIER_LABELS = ["Champion", "Podium", "Top 5", "Top 10", "Midfield", "Backmarker"]
 
-def assign_tier(pos):
+def assign_tier(pos: float | int | None) -> str:
+    """Map a championship position to its reporting tier."""
     if pd.isna(pos):
         return "Unknown"
     p = int(pos)
@@ -52,26 +58,33 @@ def assign_tier(pos):
     else:
         return "Backmarker"
 
-def get_spearman(y_true, y_pred):
+def get_spearman(y_true: Iterable[float], y_pred: Iterable[float]) -> float:
+    """Return the Spearman rank correlation for true and predicted values."""
     corr_val, _ = spearmanr(y_true, y_pred)
     return float(corr_val)  # type: ignore
 
-def train_model():
+
+def train_model() -> tuple[object | None, RandomForestClassifier]:
+    """Train, evaluate, and save the regression and tier-classification models."""
     # ── Load ──────────────────────────────────────────────────────────────
     features_path = os.path.join(PROC_DIR, "features.csv")
     df = pd.read_csv(features_path)
     df = df.dropna(subset=["champ_position"])
-    print(f"Loaded {len(df)} rows across {df['year'].nunique()} seasons ({df['year'].min()}–{df['year'].max()})")
+    logger.info("Loaded %s rows across %s seasons (%s–%s)", len(df), df["year"].nunique(), df["year"].min(), df["year"].max())
 
     test_years = sorted(df["year"].unique())[-5:]
     test_start_year = test_years[0]
     train_df = df[df["year"] < test_start_year]
     test_df = df[df["year"] >= test_start_year]
 
-    print(
-        f"Time-based split: train seasons {train_df['year'].min()}–{train_df['year'].max()} "
-        f"({train_df['year'].nunique()} seasons), test seasons {test_df['year'].min()}–{test_df['year'].max()} "
-        f"({test_df['year'].nunique()} seasons)"
+    logger.info(
+        "Time-based split: train seasons %s–%s (%s seasons), test seasons %s–%s (%s seasons)",
+        train_df["year"].min(),
+        train_df["year"].max(),
+        train_df["year"].nunique(),
+        test_df["year"].min(),
+        test_df["year"].max(),
+        test_df["year"].nunique(),
     )
 
     X_train = train_df[FEATURE_COLUMNS].fillna(0)
@@ -84,7 +97,7 @@ def train_model():
     group_cv = GroupKFold(n_splits=5)
 
     # ── Regression models ─────────────────────────────────────────────────
-    print("\n── Regression ────────────────────────────────────────────────")
+    logger.info("\n── Regression ────────────────────────────────────────────────")
     candidates = {
         "Ridge":             Ridge(alpha=1.0),
         "Random Forest":     RandomForestRegressor(n_estimators=200, max_depth=10, random_state=42),
@@ -112,22 +125,21 @@ def train_model():
         test_rmse = float(np.sqrt(mean_squared_error(y_test, y_pred)))
         sp        = get_spearman(y_test, y_pred)
 
-        print(f"  {name:20s} | CV RMSE: {cv_rmse:.3f} | R²: {test_r2:.3f} | Spearman: {sp:.3f}")
+        logger.info("  %-20s | CV RMSE: %.3f | R²: %.3f | Spearman: %.3f", name, cv_rmse, test_r2, sp)
 
         if sp > best_spearman:
             best_spearman = sp
             best_model    = m
             best_name     = name
 
-    print(f"\n  Best: {best_name} (Spearman={best_spearman:.3f})")
+    logger.info("\n  Best: %s (Spearman=%.3f)", best_name, best_spearman)
 
     if best_model is not None and hasattr(best_model, "feature_importances_"):
         imp = pd.Series(best_model.feature_importances_, index=FEATURE_COLUMNS).sort_values(ascending=False)
-        print("\n  Top 10 features:")
-        print(imp.head(10).to_string())
+        logger.info("\n  Top 10 features:\n%s", imp.head(10).to_string())
 
     # ── Tier classifier ───────────────────────────────────────────────────
-    print("\n── Classification ────────────────────────────────────────────")
+    logger.info("\n── Classification ────────────────────────────────────────────")
     clf = RandomForestClassifier(n_estimators=200, max_depth=8, random_state=42)
     cv_clf = cross_val_score(
         clf,
@@ -147,13 +159,15 @@ def train_model():
         output_dict=True,
         zero_division=0,
     )
-    print(
-        f"  Tier Classifier | Grouped CV Acc: {cv_clf.mean():.3f} | "
-        f"Test Acc: {test_acc:.3f} | Test Macro F1: {report['macro avg']['f1-score']:.3f}"
+    logger.info(
+        "  Tier Classifier | Grouped CV Acc: %.3f | Test Acc: %.3f | Test Macro F1: %.3f",
+        cv_clf.mean(),
+        test_acc,
+        report["macro avg"]["f1-score"],
     )
-    print("  Per-class F1:")
+    logger.info("  Per-class F1:")
     for tier in TIER_LABELS:
-        print(f"    {tier:10s} | F1: {report[tier]['f1-score']:.3f}")
+        logger.info("    %-10s | F1: %.3f", tier, report[tier]["f1-score"])
 
     # ── Save ──────────────────────────────────────────────────────────────
     reg_path = os.path.join(MODEL_DIR, "championship_model.pkl")
@@ -164,9 +178,10 @@ def train_model():
     with open(clf_path, "wb") as f:
         pickle.dump(clf, f)
 
-    print(f"\n  Saved regression model → {reg_path}")
-    print(f"  Saved tier classifier  → {clf_path}")
+    logger.info("\n  Saved regression model → %s", reg_path)
+    logger.info("  Saved tier classifier  → %s", clf_path)
     return best_model, clf
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     train_model()

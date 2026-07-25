@@ -1,5 +1,9 @@
+import logging
 import os
+
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 BASE_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -7,11 +11,12 @@ RAW_DIR    = os.path.join(BASE_DIR, "data", "raw")
 PROC_DIR   = os.path.join(BASE_DIR, "data", "processed")
 os.makedirs(PROC_DIR, exist_ok=True)
 
-def _path(filename):
+def _path(filename: str) -> str:
     return os.path.join(RAW_DIR, filename)
 
 # ── Load ───────────────────────────────────────────────────────────────────────
-def load_raw_data():
+def load_raw_data() -> tuple[pd.DataFrame, ...]:
+    """Load the raw Ergast-compatible CSV tables required by feature engineering."""
     races             = pd.read_csv(_path("races.csv"))
     results           = pd.read_csv(_path("results.csv"))
     drivers           = pd.read_csv(_path("drivers.csv"))
@@ -28,9 +33,19 @@ def load_raw_data():
             qualifying, status, sprint_results, pit_stops)
 
 # ── Feature Engineering ────────────────────────────────────────────────────────
-def create_features(races, results, drivers, constructors,
-                    driver_standings, constructor_standings,
-                    qualifying, status, sprint_results, pit_stops):
+def create_features(
+    races: pd.DataFrame,
+    results: pd.DataFrame,
+    drivers: pd.DataFrame,
+    constructors: pd.DataFrame,
+    driver_standings: pd.DataFrame,
+    constructor_standings: pd.DataFrame,
+    qualifying: pd.DataFrame,
+    status: pd.DataFrame,
+    sprint_results: pd.DataFrame,
+    pit_stops: pd.DataFrame,
+) -> pd.DataFrame:
+    """Aggregate raw race tables into one driver-season feature DataFrame."""
 
     # ── Base merge ──────────────────────────────────────────────────────────
     df = (results
@@ -109,13 +124,14 @@ def create_features(races, results, drivers, constructors,
     # ── Save ─────────────────────────────────────────────────────────────────
     out_path = os.path.join(PROC_DIR, "features.csv")
     agg.to_csv(out_path, index=False)
-    print(f"Saved {len(agg)} rows → {out_path}")
+    logger.info("Saved %s rows → %s", len(agg), out_path)
     return agg
 
 # ── Entry point ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     data = load_raw_data()
     features = create_features(*data)
-    print(features.head())
-    print(f"\nFeatures shape: {features.shape}")
-    print(f"Columns: {list(features.columns)}")
+    logger.info("%s", features.head())
+    logger.info("\nFeatures shape: %s", features.shape)
+    logger.info("Columns: %s", list(features.columns))

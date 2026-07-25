@@ -1,3 +1,4 @@
+import logging
 import matplotlib
 matplotlib.use("Agg")
 
@@ -7,12 +8,14 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import pandas as pd
 
+logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 RESULTS_DIR = BASE_DIR / "results"
 
 
-def create_visualisation(year: int = 2023):
+def create_visualisation(year: int = 2023) -> Path:
+    """Create and save a predicted-versus-actual standings chart for a season."""
     predictions_path = RESULTS_DIR / f"{year}_predictions.csv"
     if not predictions_path.exists():
         raise FileNotFoundError(
@@ -55,9 +58,10 @@ def create_visualisation(year: int = 2023):
     fig.tight_layout()
     fig.savefig(output_path, dpi=150)
     plt.close(fig)
-    print(f"Chart saved to {output_path}")
+    logger.info("Chart saved to %s", output_path)
     return output_path
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     create_visualisation()

@@ -1,6 +1,7 @@
 import argparse
-import sys
+import logging
 import os
+import sys
 
 # Add src to path so we can import directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
@@ -9,7 +10,12 @@ from data_processing import load_raw_data, create_features
 from model import train_model
 from predict import predict_championship
 
-def main():
+logger = logging.getLogger(__name__)
+
+
+def main() -> None:
+    """Run processing, model training, prediction, and optional visualisation."""
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(
         description="F1 Championship Prediction Pipeline"
     )
@@ -38,37 +44,37 @@ def main():
 
     # ── Step 1: Data Processing ────────────────────────────────────────────
     if args.skip_processing:
-        print("⏭️  Skipping data processing (--skip-processing flag set)")
+        logger.info("⏭️  Skipping data processing (--skip-processing flag set)")
     else:
-        print("=" * 60)
-        print("STEP 1: Data Processing")
-        print("=" * 60)
+        logger.info("%s", "=" * 60)
+        logger.info("STEP 1: Data Processing")
+        logger.info("%s", "=" * 60)
         data = load_raw_data()
         create_features(*data)
 
     # ── Step 2: Model Training ─────────────────────────────────────────────
     if args.skip_training:
-        print("\n⏭️  Skipping model training (--skip-training flag set)")
+        logger.info("\n⏭️  Skipping model training (--skip-training flag set)")
     else:
-        print("\n" + "=" * 60)
-        print("STEP 2: Model Training")
-        print("=" * 60)
+        logger.info("\n%s", "=" * 60)
+        logger.info("STEP 2: Model Training")
+        logger.info("%s", "=" * 60)
         train_model()
 
     # ── Step 3: Prediction ─────────────────────────────────────────────────
-    print("\n" + "=" * 60)
-    print(f"STEP 3: Predicting {args.year} Championship")
-    print("=" * 60)
+    logger.info("\n%s", "=" * 60)
+    logger.info("STEP 3: Predicting %s Championship", args.year)
+    logger.info("%s", "=" * 60)
     predict_championship(args.year)
 
     if args.visualise:
-        print("\n" + "=" * 60)
-        print(f"STEP 4: Visualising {args.year} Championship")
-        print("=" * 60)
+        logger.info("\n%s", "=" * 60)
+        logger.info("STEP 4: Visualising %s Championship", args.year)
+        logger.info("%s", "=" * 60)
         from visualise import create_visualisation
         create_visualisation(args.year)
 
-    print("\n✅  Pipeline complete!")
+    logger.info("\n✅  Pipeline complete!")
 
 if __name__ == "__main__":
     main()

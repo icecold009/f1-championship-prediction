@@ -1,7 +1,12 @@
+import logging
 import os
 import pickle
+
 import pandas as pd
 from scipy.stats import spearmanr
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -30,7 +35,8 @@ FEATURE_COLUMNS = [
     "prev_season_win_rate",
 ]
 
-def load_models():
+def load_models() -> tuple[Any, Any]:
+    """Load the saved regression and tier-classification model artifacts."""
     reg_path = os.path.join(MODEL_DIR, "championship_model.pkl")
     clf_path = os.path.join(MODEL_DIR, "tier_classifier.pkl")
     with open(reg_path, "rb") as f:
@@ -39,7 +45,8 @@ def load_models():
         clf_model = pickle.load(f)
     return reg_model, clf_model
 
-def predict_championship(year: int):
+def predict_championship(year: int) -> pd.DataFrame | None:
+    """Predict and save the ordered championship standings for one season."""
     # ── Load models and features ───────────────────────────────────────────
     reg_model, clf_model = load_models()
 
@@ -48,7 +55,7 @@ def predict_championship(year: int):
     season_df = df[df["year"] == year].copy()
 
     if season_df.empty:
-        print(f"No data found for year {year}. Available years: {sorted(df['year'].unique())}")
+        logger.info("No data found for year %s. Available years: %s", year, sorted(df["year"].unique()))
         return
 
     # ── Load driver and constructor names for readable output ──────────────
@@ -103,19 +110,20 @@ def predict_championship(year: int):
         valid = output.dropna(subset=["Actual Position"])
         corr_val, _ = spearmanr(valid["Actual Position"], valid["Predicted Score"])
         spearman = round(float(corr_val), 3)  # type: ignore
-        print(f"\n── {year} Championship Prediction ─────────────────────────────")
-        print(f"  Spearman rank correlation vs actual: {spearman}")
+        logger.info("\n── %s Championship Prediction ─────────────────────────────", year)
+        logger.info("  Spearman rank correlation vs actual: %s", spearman)
     else:
-        print(f"\n── {year} Championship Prediction (no actual results yet) ──────")
+        logger.info("\n── %s Championship Prediction (no actual results yet) ──────", year)
 
-    print(f"\n{output.to_string(index=False)}")
+    logger.info("\n%s", output.to_string(index=False))
 
     # ── Save ─────────────────────────────────────────────────────────────
     out_path = os.path.join(RESULTS_DIR, f"{year}_predictions.csv")
     output.to_csv(out_path, index=False)
-    print(f"\n  Saved → {out_path}")
+    logger.info("\n  Saved → %s", out_path)
     return output
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     # Change year to any season in your dataset
     predict_championship(2023)
