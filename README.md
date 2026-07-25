@@ -1,7 +1,7 @@
 # f1-championship-prediction
 # Predicting F1 Championship Final Standings 🏎️📊
 
-A data science project where I use historical Formula 1 race data to **predict the final Drivers’ Championship standings** for a season.
+A data science project where I use historical Formula 1 race data to **forecast the final Drivers’ Championship standings** for a season.
 
 The goal is to explore how well machine learning models can approximate the final rankings using data like race results, qualifying performance, team strength, and driver consistency.
 
@@ -10,15 +10,11 @@ The goal is to explore how well machine learning models can approximate the fina
 This project focuses on:
 
 - Collecting and cleaning **historical F1 data** (drivers, constructors, races, results)
-- Engineering features that represent:
-  - Driver performance across races  
-  - Team/constructor strength  
-  - Qualifying vs race pace  
-  - Reliability (DNFs, DNS, etc.)
+- Engineering features that represent prior-season driver performance, constructor strength, qualifying pace, and reliability
 - Training machine learning models to:
   - Predict **final points**
   - Predict **final position / tier** (e.g. champion, podium contender, midfield, backmarker)
-- Evaluating how well we can **reconstruct the final standings** of a season using only historic season data up to that point.
+- Evaluating how well we can **forecast a season's final standings** without using that season's race outcomes as predictors.
 
 ## Quickstart
 
@@ -77,7 +73,7 @@ The dataset includes (per season and per driver):
   - Points scored  
   - Grid position  
   - DNFs / DNS  
-- Season-level aggregates:
+- Historical season-level aggregates:
   - Total races started  
   - Average finish position  
   - Average grid position  
@@ -90,55 +86,54 @@ The project uses this dataset as its raw-data source; the local `data/raw/` file
 
 ## Features & Approach
 
-Key feature engineering ideas:
+Key feature engineering ideas. All predictors are available before the target
+season's championship outcome is known:
 
 ### Performance metrics
 
-- Average finish position  
-- Average grid position  
-- Delta between grid and finish (racecraft)  
-- Win / podium / points-scoring rate  
+- Prior-season average finish position
+- Prior-season average grid position
+- Prior-season grid-to-finish delta (racecraft)
+- Prior-season win / podium / points-scoring rates
 
 ### Reliability
 
-- Number and percentage of DNFs  
-- Races started vs races in season  
+- Prior-season number and percentage of DNFs
+- Prior-season races started
 
 ### Team strength
 
-- Total constructor points  
-- Team average finish position  
-- Team average qualifying position  
+- Prior constructor championship points
+- Prior constructor championship position
 
-### Experience
-
-- Seasons in F1  
-- Total career points (up to that year)  
+The current season's race results are not used as predictors. The season-opening
+constructor is used to join its prior final championship strength, while the
+final driver standings are retained only as evaluation targets.
 
 ## Model Results
 
 Models trained on seasons 1950–2019 and evaluated on the latest five seasons (2020–2024).
-Cross-validation groups rows by season to avoid leakage across seasons.
+Each forecast row uses the driver's prior-season statistics and the prior final standings of the constructor they enter with. Same-season race results are used only to identify entrants and construct the final target, not as model inputs. Cross-validation groups rows by season to avoid leakage across seasons.
 Ranking quality measured with Spearman correlation (higher = better predicted order).
 
 | Model | CV RMSE | R² | Spearman ρ |
 |---|---|---|---|
-| Ridge Regression | 10.511 | -0.391 | 0.777 |
-| Random Forest Regressor | 9.174 | 0.798 | 0.973 |
-| Gradient Boosting Regressor | 9.348 | 0.773 | 0.976 |
+| Ridge Regression | 17.410 | -1.789 | 0.699 |
+| Random Forest Regressor | 16.828 | 0.236 | 0.832 |
+| Gradient Boosting Regressor | 17.404 | 0.152 | 0.776 |
 
-**Best model:** Gradient Boosting — selected by highest Spearman ρ (0.976).
+**Best model:** Random Forest — selected by highest Spearman ρ (0.832).
 
-**Tier Classifier (Random Forest):** Stratified Grouped CV Accuracy 0.858 | Test Accuracy 0.728 | Test Macro F1 0.681
+**Tier Classifier (Random Forest):** Stratified Grouped CV Accuracy 0.707 | Test Accuracy 0.518 | Test Macro F1 0.461
 
 | Tier | Test F1 |
 |---|---:|
-| Champion | 0.800 |
-| Podium | 0.632 |
-| Top 5 | 0.381 |
-| Top 10 | 0.691 |
-| Midfield | 0.680 |
-| Backmarker | 0.904 |
+| Champion | 0.667 |
+| Podium | 0.471 |
+| Top 5 | 0.125 |
+| Top 10 | 0.515 |
+| Midfield | 0.256 |
+| Backmarker | 0.730 |
 
 ---
 
@@ -146,16 +141,16 @@ Ranking quality measured with Spearman correlation (higher = better predicted or
 
 | Rank | Feature | Importance |
 |---|---|---|
-| 1 | points_sum | 0.362626 |
-| 2 | avg_finish_pos | 0.177251 |
-| 3 | team_final_position | 0.163500 |
-| 4 | points_per_race | 0.145328 |
-| 5 | races_started | 0.035875 |
-| 6 | prev_season_points | 0.023919 |
-| 7 | std_finish_pos | 0.020127 |
-| 8 | quali_to_race_delta | 0.018182 |
-| 9 | prev_season_avg_pos | 0.017307 |
-| 10 | team_final_points | 0.016320 |
+| 1 | prev_season_races_started | 0.504747 |
+| 2 | prev_team_final_position | 0.132477 |
+| 3 | prev_season_avg_grid_pos | 0.074579 |
+| 4 | prev_season_avg_finish_pos | 0.056302 |
+| 5 | prev_season_quali_to_race_delta | 0.056148 |
+| 6 | prev_team_final_points | 0.052832 |
+| 7 | prev_season_points_sum | 0.050951 |
+| 8 | prev_season_std_finish_pos | 0.032967 |
+| 9 | prev_season_points_per_race | 0.018516 |
+| 10 | prev_season_dnf_rate | 0.013810 |
 
 ## Tech Stack
 

@@ -17,22 +17,19 @@ RESULTS_DIR = os.path.join(BASE_DIR, "results")
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
 FEATURE_COLUMNS = [
-    "avg_finish_pos",
-    "std_finish_pos",
-    "races_started",
-    "points_sum",
-    "avg_grid_pos",
-    "win_rate",
-    "podium_rate",
-    "dnf_rate",
-    "points_per_race",
-    "quali_to_race_delta",
-    "sprint_points_sum",
-    "team_final_points",
-    "team_final_position",
-    "prev_season_points",
-    "prev_season_avg_pos",
+    "prev_season_races_started",
+    "prev_season_avg_finish_pos",
+    "prev_season_std_finish_pos",
+    "prev_season_points_sum",
+    "prev_season_avg_grid_pos",
     "prev_season_win_rate",
+    "prev_season_podium_rate",
+    "prev_season_dnf_rate",
+    "prev_season_points_per_race",
+    "prev_season_quali_to_race_delta",
+    "prev_season_sprint_points_sum",
+    "prev_team_final_points",
+    "prev_team_final_position",
 ]
 
 def load_models() -> tuple[Any, Any]:

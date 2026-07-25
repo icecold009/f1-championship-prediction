@@ -5,34 +5,43 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# ── Paths ──────────────────────────────────────────────────────────────────────
-BASE_DIR   = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RAW_DIR    = os.path.join(BASE_DIR, "data", "raw")
-PROC_DIR   = os.path.join(BASE_DIR, "data", "processed")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+RAW_DIR = os.path.join(BASE_DIR, "data", "raw")
+PROC_DIR = os.path.join(BASE_DIR, "data", "processed")
 os.makedirs(PROC_DIR, exist_ok=True)
+
 
 def _path(filename: str) -> str:
     return os.path.join(RAW_DIR, filename)
 
-# ── Load ───────────────────────────────────────────────────────────────────────
+
 def load_raw_data() -> tuple[pd.DataFrame, ...]:
     """Load the raw Ergast-compatible CSV tables required by feature engineering."""
-    races             = pd.read_csv(_path("races.csv"))
-    results           = pd.read_csv(_path("results.csv"))
-    drivers           = pd.read_csv(_path("drivers.csv"))
-    constructors      = pd.read_csv(_path("constructors.csv"))
-    driver_standings  = pd.read_csv(_path("driver_standings.csv"))
+    races = pd.read_csv(_path("races.csv"))
+    results = pd.read_csv(_path("results.csv"))
+    drivers = pd.read_csv(_path("drivers.csv"))
+    constructors = pd.read_csv(_path("constructors.csv"))
+    driver_standings = pd.read_csv(_path("driver_standings.csv"))
     constructor_standings = pd.read_csv(_path("constructor_standings.csv"))
-    qualifying        = pd.read_csv(_path("qualifying.csv"))
-    status            = pd.read_csv(_path("status.csv"))
-    sprint_results    = pd.read_csv(_path("sprint_results.csv"))
-    pit_stops         = pd.read_csv(_path("pit_stops.csv"))
+    qualifying = pd.read_csv(_path("qualifying.csv"))
+    status = pd.read_csv(_path("status.csv"))
+    sprint_results = pd.read_csv(_path("sprint_results.csv"))
+    pit_stops = pd.read_csv(_path("pit_stops.csv"))
 
-    return (races, results, drivers, constructors,
-            driver_standings, constructor_standings,
-            qualifying, status, sprint_results, pit_stops)
+    return (
+        races,
+        results,
+        drivers,
+        constructors,
+        driver_standings,
+        constructor_standings,
+        qualifying,
+        status,
+        sprint_results,
+        pit_stops,
+    )
 
-# ── Feature Engineering ────────────────────────────────────────────────────────
+
 def create_features(
     races: pd.DataFrame,
     results: pd.DataFrame,
@@ -45,93 +54,165 @@ def create_features(
     sprint_results: pd.DataFrame,
     pit_stops: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Aggregate raw race tables into one driver-season feature DataFrame."""
+    """Build leakage-safe, one-row-per-driver-season forecasting features.
 
-    # ── Base merge ──────────────────────────────────────────────────────────
-    df = (results
-          .merge(races[["raceId", "year", "round"]], on="raceId", how="left")
-          .merge(drivers[["driverId", "driverRef"]], on="driverId", how="left")
-          .merge(constructors[["constructorId", "constructorRef"]], on="constructorId", how="left"))
+    Predictors describe the driver's prior season and the prior final strength
+    of the constructor they enter with. Current-season results are retained
+    only to identify entrants and construct the final championship targets.
+    """
+    del qualifying, pit_stops  # Reserved for future pre-season features.
 
-    # ── DNF flag using status.csv ────────────────────────────────────────────
-    # statusId == 1 means "Finished"; everything else is a non-finish
+    # Join race metadata and stable driver/constructor identifiers.
+    df = (
+        results
+        .merge(races[["raceId", "year", "round"]], on="raceId", how="left")
+        .merge(drivers[["driverId", "driverRef"]], on="driverId", how="left")
+        .merge(
+            constructors[["constructorId", "constructorRef"]],
+            on="constructorId",
+            how="left",
+        )
+    )
+
+    # statusId == 1 means "Finished"; everything else is a non-finish.
     finished_ids = status.loc[status["status"] == "Finished", "statusId"].values
     df["dnf"] = (~df["statusId"].isin(finished_ids)).astype(int)
 
-    # ── Position: replace "\N" (Ergast null) with NaN, then cast ────────────
     df["positionOrder"] = pd.to_numeric(df["positionOrder"], errors="coerce")
-    df["grid"]          = pd.to_numeric(df["grid"],          errors="coerce")
-    df["points"]        = pd.to_numeric(df["points"],        errors="coerce").fillna(0)
+    df["grid"] = pd.to_numeric(df["grid"], errors="coerce")
+    df["points"] = pd.to_numeric(df["points"], errors="coerce").fillna(0)
 
-    # ── Per-driver, per-season aggregates ───────────────────────────────────
-    agg = df.groupby(["year", "driverId", "constructorId", "driverRef", "constructorRef"]).agg(
-        races_started       = ("raceId",        "count"),
-        avg_finish_pos      = ("positionOrder", "mean"),
-        std_finish_pos      = ("positionOrder", "std"),
-        points_sum          = ("points",        "sum"),
-        avg_grid_pos        = ("grid",          "mean"),
-        wins                = ("positionOrder", lambda x: (x == 1).sum()),
-        podiums             = ("positionOrder", lambda x: (x <= 3).sum()),
-        points_finishes     = ("positionOrder", lambda x: (x <= 10).sum()),
-        dnf_count           = ("dnf",           "sum"),
+    # Build historical driver-season statistics. These are shifted forward by
+    # one year below, so no same-season race outcome becomes a predictor.
+    driver_stats = df.groupby(["year", "driverId", "driverRef"]).agg(
+        races_started=("raceId", "count"),
+        avg_finish_pos=("positionOrder", "mean"),
+        std_finish_pos=("positionOrder", "std"),
+        points_sum=("points", "sum"),
+        avg_grid_pos=("grid", "mean"),
+        wins=("positionOrder", lambda values: (values == 1).sum()),
+        podiums=("positionOrder", lambda values: (values <= 3).sum()),
+        points_finishes=("positionOrder", lambda values: (values <= 10).sum()),
+        dnf_count=("dnf", "sum"),
     ).reset_index()
 
-    agg["win_rate"]        = agg["wins"]    / agg["races_started"]
-    agg["podium_rate"]     = agg["podiums"] / agg["races_started"]
-    agg["dnf_rate"]        = agg["dnf_count"] / agg["races_started"]
-    agg["points_per_race"] = agg["points_sum"]  / agg["races_started"]
+    driver_stats["win_rate"] = driver_stats["wins"] / driver_stats["races_started"]
+    driver_stats["podium_rate"] = driver_stats["podiums"] / driver_stats["races_started"]
+    driver_stats["dnf_rate"] = driver_stats["dnf_count"] / driver_stats["races_started"]
+    driver_stats["points_per_race"] = driver_stats["points_sum"] / driver_stats["races_started"]
+    driver_stats["quali_to_race_delta"] = (
+        driver_stats["avg_grid_pos"] - driver_stats["avg_finish_pos"]
+    )
 
-    # ── Qualifying delta (avg grid vs avg finish — positive = gained places) ─
-    agg["quali_to_race_delta"] = agg["avg_grid_pos"] - agg["avg_finish_pos"]
-
-    # ── Sprint points ────────────────────────────────────────────────────────
+    sprint_results = sprint_results.copy()
     sprint_results["sprintPoints"] = pd.to_numeric(
-        sprint_results["points"], errors="coerce").fillna(0)
-    sprint_agg = (sprint_results
-                  .merge(races[["raceId", "year"]], on="raceId", how="left")
-                  .groupby(["year", "driverId"])["sprintPoints"]
-                  .sum()
-                  .reset_index()
-                  .rename(columns={"sprintPoints": "sprint_points_sum"}))
-    agg = agg.merge(sprint_agg, on=["year", "driverId"], how="left")
-    agg["sprint_points_sum"] = agg["sprint_points_sum"].fillna(0)
+        sprint_results["points"], errors="coerce"
+    ).fillna(0)
+    sprint_agg = (
+        sprint_results
+        .merge(races[["raceId", "year"]], on="raceId", how="left")
+        .groupby(["year", "driverId"])["sprintPoints"]
+        .sum()
+        .reset_index()
+        .rename(columns={"sprintPoints": "sprint_points_sum"})
+    )
+    driver_stats = driver_stats.merge(sprint_agg, on=["year", "driverId"], how="left")
+    driver_stats["sprint_points_sum"] = driver_stats["sprint_points_sum"].fillna(0)
 
-    # ── Constructor season strength (from constructor_standings) ─────────────
-    cs_merged = constructor_standings.merge(races[["raceId", "year"]], on="raceId", how="left")
-    # Take the last standings entry per constructor per season
-    cs_final = (cs_merged.sort_values("raceId")
-                          .groupby(["year", "constructorId"])
-                          .tail(1)[["year", "constructorId", "points", "position"]]
-                          .rename(columns={"points":   "team_final_points",
-                                           "position": "team_final_position"}))
-    agg = agg.merge(cs_final, on=["year", "constructorId"], how="left")
+    # Take the last constructor standings entry per constructor and season.
+    constructor_rows = constructor_standings.merge(
+        races[["raceId", "year"]], on="raceId", how="left"
+    )
+    constructor_final = (
+        constructor_rows.sort_values(["year", "raceId"])
+        .groupby(["year", "constructorId"])
+        .tail(1)[["year", "constructorId", "points", "position"]]
+        .rename(
+            columns={
+                "points": "team_final_points",
+                "position": "team_final_position",
+            }
+        )
+    )
 
-    # ── Previous-season features ─────────────────────────────────────────────
-    agg = agg.sort_values(["driverId", "year"])
-    agg["prev_season_points"]      = agg.groupby("driverId")["points_sum"].shift(1)
-    agg["prev_season_avg_pos"]     = agg.groupby("driverId")["avg_finish_pos"].shift(1)
-    agg["prev_season_win_rate"]    = agg.groupby("driverId")["win_rate"].shift(1)
+    # The first observed constructor is the season-opening team available at
+    # forecast time; later same-season team changes must not affect features.
+    season_entries = (
+        df.sort_values(["year", "round", "raceId"])
+        .drop_duplicates(["year", "driverId"])
+        [["year", "driverId", "constructorId", "driverRef", "constructorRef"]]
+    )
 
-    # ── Target variable: driver's FINAL championship position & points ───────
-    ds_merged = driver_standings.merge(races[["raceId", "year"]], on="raceId", how="left")
-    final_ds  = (ds_merged.sort_values("raceId")
-                           .groupby(["year", "driverId"])
-                           .tail(1)[["year", "driverId", "position", "points"]]
-                           .rename(columns={"position": "champ_position",
-                                            "points":   "champ_points"}))
-    agg = agg.merge(final_ds, on=["year", "driverId"], how="left")
+    history_columns = [
+        "races_started",
+        "avg_finish_pos",
+        "std_finish_pos",
+        "points_sum",
+        "avg_grid_pos",
+        "win_rate",
+        "podium_rate",
+        "dnf_rate",
+        "points_per_race",
+        "quali_to_race_delta",
+        "sprint_points_sum",
+    ]
+    prior_driver = driver_stats.copy()
+    prior_driver["year"] += 1
+    prior_driver = prior_driver[["year", "driverId", *history_columns]].rename(
+        columns={column: f"prev_season_{column}" for column in history_columns}
+    )
+    features = season_entries.merge(prior_driver, on=["year", "driverId"], how="left")
 
-    # ── Save ─────────────────────────────────────────────────────────────────
+    prior_constructor = constructor_final.copy()
+    prior_constructor["year"] += 1
+    prior_constructor = prior_constructor.rename(
+        columns={
+            "team_final_points": "prev_team_final_points",
+            "team_final_position": "prev_team_final_position",
+        }
+    )
+    features = features.merge(
+        prior_constructor[
+            [
+                "year",
+                "constructorId",
+                "prev_team_final_points",
+                "prev_team_final_position",
+            ]
+        ],
+        on=["year", "constructorId"],
+        how="left",
+    )
+
+    # Targets are the final driver standings for the current season.
+    standings_rows = driver_standings.merge(
+        races[["raceId", "year"]], on="raceId", how="left"
+    )
+    final_driver_standings = (
+        standings_rows.sort_values(["year", "raceId"])
+        .groupby(["year", "driverId"])
+        .tail(1)[["year", "driverId", "position", "points"]]
+        .rename(
+            columns={
+                "position": "champ_position",
+                "points": "champ_points",
+            }
+        )
+    )
+    features = features.merge(
+        final_driver_standings, on=["year", "driverId"], how="left"
+    )
+
     out_path = os.path.join(PROC_DIR, "features.csv")
-    agg.to_csv(out_path, index=False)
-    logger.info("Saved %s rows → %s", len(agg), out_path)
-    return agg
+    features.to_csv(out_path, index=False)
+    logger.info("Saved %s rows -> %s", len(features), out_path)
+    return features
 
-# ── Entry point ────────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     data = load_raw_data()
     features = create_features(*data)
     logger.info("%s", features.head())
-    logger.info("\nFeatures shape: %s", features.shape)
+    logger.info("Features shape: %s", features.shape)
     logger.info("Columns: %s", list(features.columns))
