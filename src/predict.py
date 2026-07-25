@@ -39,10 +39,19 @@ def load_models() -> tuple[Any, Any]:
     """Load the saved regression and tier-classification model artifacts."""
     reg_path = os.path.join(MODEL_DIR, "championship_model.pkl")
     clf_path = os.path.join(MODEL_DIR, "tier_classifier.pkl")
-    with open(reg_path, "rb") as f:
-        reg_model = pickle.load(f)
-    with open(clf_path, "rb") as f:
-        clf_model = pickle.load(f)
+    try:
+        with open(reg_path, "rb") as f:
+            reg_model = pickle.load(f)
+        with open(clf_path, "rb") as f:
+            clf_model = pickle.load(f)
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "Saved models were not found. Run `python src/model.py` first."
+        ) from exc
+    except (EOFError, OSError, pickle.UnpicklingError) as exc:
+        raise RuntimeError(
+            "Saved model artifacts could not be loaded. Run `python src/model.py` again."
+        ) from exc
     return reg_model, clf_model
 
 def predict_championship(year: int) -> pd.DataFrame | None:
@@ -55,7 +64,8 @@ def predict_championship(year: int) -> pd.DataFrame | None:
     season_df = df[df["year"] == year].copy()
 
     if season_df.empty:
-        logger.info("No data found for year %s. Available years: %s", year, sorted(df["year"].unique()))
+        available_years = [int(value) for value in sorted(df["year"].unique())]
+        logger.info("No data found for year %s. Available years: %s", year, available_years)
         return
 
     # ── Load driver and constructor names for readable output ──────────────

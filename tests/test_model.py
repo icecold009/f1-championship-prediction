@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+from src import predict
 from src.model import assign_tier, get_spearman
 
 
@@ -27,3 +28,10 @@ def test_assign_tier_missing_position_is_unknown():
 def test_get_spearman_perfect_and_inverse_rankings():
     assert get_spearman([1, 2, 3], [10, 20, 30]) == pytest.approx(1.0)
     assert get_spearman([1, 2, 3], [30, 20, 10]) == pytest.approx(-1.0)
+
+
+def test_load_models_reports_missing_artifacts(tmp_path, monkeypatch):
+    monkeypatch.setattr(predict, "MODEL_DIR", str(tmp_path))
+
+    with pytest.raises(RuntimeError, match="Run `python src/model.py` first"):
+        predict.load_models()

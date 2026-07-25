@@ -2,6 +2,7 @@ import argparse
 import logging
 import os
 import sys
+import textwrap
 
 # Add src to path so we can import directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
@@ -13,11 +14,20 @@ from predict import predict_championship
 logger = logging.getLogger(__name__)
 
 
-def main() -> None:
+def main() -> int:
     """Run processing, model training, prediction, and optional visualisation."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(
-        description="F1 Championship Prediction Pipeline"
+        description="F1 Championship Prediction Pipeline",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=textwrap.dedent(
+            """
+            Examples:
+              python main.py --year 2022 --skip-processing
+              python main.py --year 2023 --visualise
+              python main.py --year 2023 --skip-processing --skip-training
+            """
+        ),
     )
     parser.add_argument(
         "--year",
@@ -65,7 +75,14 @@ def main() -> None:
     logger.info("\n%s", "=" * 60)
     logger.info("STEP 3: Predicting %s Championship", args.year)
     logger.info("%s", "=" * 60)
-    predict_championship(args.year)
+    try:
+        prediction = predict_championship(args.year)
+    except RuntimeError as exc:
+        logger.error("%s", exc)
+        return 1
+    if prediction is None:
+        logger.error("Prediction failed for year %s; pipeline did not complete.", args.year)
+        return 1
 
     if args.visualise:
         logger.info("\n%s", "=" * 60)
@@ -75,6 +92,7 @@ def main() -> None:
         create_visualisation(args.year)
 
     logger.info("\n✅  Pipeline complete!")
+    return 0
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
