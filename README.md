@@ -39,6 +39,16 @@ Predictions are saved to `results/2023_predictions.csv`; the optional chart is s
 `results/predicted_vs_actual_2023.png`. Processed data and result files are regenerated locally
 and ignored by Git.
 
+## Tests
+
+Run the unit tests locally with:
+
+```bash
+python -m pytest -q
+```
+
+The same test command runs in GitHub Actions for Python 3.12 and 3.13.
+
 ## Problem Framing
 
 There are two main prediction tasks:
