@@ -116,6 +116,22 @@ Models trained on seasons 1950–2019 and evaluated on the latest five seasons (
 Each forecast row uses the driver's prior-season statistics and the prior final standings of the constructor they enter with. Same-season race results are used only to identify entrants and construct the final target, not as model inputs. Cross-validation groups rows by season to avoid leakage across seasons.
 Ranking quality measured with Spearman correlation (higher = better predicted order).
 
+### Rolling-origin backtest
+
+Each regressor was retrained before each test season from **2015–2024**, using
+only seasons earlier than that test season. Values below are the mean and
+standard deviation across the ten chronological test seasons.
+
+| Model | Mean RMSE | RMSE SD | Mean Spearman | Spearman SD |
+|---|---:|---:|---:|---:|
+| Random Forest | 6.657 | 2.818 | 0.808 | 0.061 |
+| Gradient Boosting | 6.888 | 2.747 | 0.788 | 0.057 |
+| Ridge | 11.921 | 2.317 | 0.686 | 0.102 |
+
+The fixed 2020–2024 holdout below is retained as the headline comparison;
+the rolling-origin results show how stable performance is across multiple
+forecast cutoffs rather than relying on one test window.
+
 | Model | CV RMSE | R² | Spearman ρ |
 |---|---|---|---|
 | Ridge Regression | 17.410 | -1.789 | 0.699 |

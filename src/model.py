@@ -36,6 +36,7 @@ FEATURE_COLUMNS = [
 ]
 
 TIER_LABELS = ["Champion", "Podium", "Top 5", "Top 10", "Midfield", "Backmarker"]
+ROLLING_ORIGIN_TEST_SEASONS = 10
 
 
 def assign_tier(pos: float | int | None) -> str:
@@ -61,6 +62,63 @@ def get_spearman(y_true: Iterable[float], y_pred: Iterable[float]) -> float:
     """Return the Spearman rank correlation for true and predicted values."""
     corr_val, _ = spearmanr(y_true, y_pred)
     return float(corr_val)  # type: ignore
+
+
+def _regression_candidates() -> dict[str, object]:
+    """Create fresh regression estimators for one evaluation run."""
+    return {
+        "Ridge": Ridge(alpha=1.0),
+        "Random Forest": RandomForestRegressor(
+            n_estimators=200, max_depth=10, random_state=42
+        ),
+        "Gradient Boosting": GradientBoostingRegressor(
+            n_estimators=200, max_depth=5, random_state=42
+        ),
+    }
+
+
+def evaluate_rolling_origin(
+    df: pd.DataFrame,
+    test_seasons: int = ROLLING_ORIGIN_TEST_SEASONS,
+    min_train_seasons: int = 20,
+) -> pd.DataFrame:
+    """Evaluate regressors on successive future seasons.
+
+    For each test season, models train only on earlier seasons. The returned
+    rows retain the train cutoff so the evaluation is auditable and cannot
+    silently become a random split.
+    """
+    evaluation_df = df.dropna(subset=["champ_position"]).copy()
+    seasons = sorted(int(year) for year in evaluation_df["year"].unique())
+    first_test_index = max(min_train_seasons, len(seasons) - test_seasons)
+    rows: list[dict[str, float | int | str]] = []
+
+    for test_year in seasons[first_test_index:]:
+        train_df = evaluation_df[evaluation_df["year"] < test_year]
+        test_df = evaluation_df[evaluation_df["year"] == test_year]
+        train_years = sorted(int(year) for year in train_df["year"].unique())
+        if len(train_years) < min_train_seasons or test_df.empty:
+            continue
+
+        X_train = train_df[FEATURE_COLUMNS].fillna(0)
+        y_train = train_df["champ_position"]
+        X_test = test_df[FEATURE_COLUMNS].fillna(0)
+        y_test = test_df["champ_position"]
+
+        for name, model in _regression_candidates().items():
+            model.fit(X_train, y_train)  # type: ignore[attr-defined]
+            predictions = model.predict(X_test)  # type: ignore[attr-defined]
+            rows.append(
+                {
+                    "test_year": test_year,
+                    "train_end_year": train_years[-1],
+                    "model": name,
+                    "rmse": float(np.sqrt(mean_squared_error(y_test, predictions))),
+                    "spearman": get_spearman(y_test, predictions),
+                }
+            )
+
+    return pd.DataFrame(rows)
 
 
 def train_model() -> tuple[object | None, RandomForestClassifier]:
@@ -98,12 +156,28 @@ def train_model() -> tuple[object | None, RandomForestClassifier]:
     classifier_cv = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42)
 
     # ── Regression models ─────────────────────────────────────────────────
+    rolling_results = evaluate_rolling_origin(df)
+    logger.info(
+        "\n── Rolling-origin backtest (%s seasons) ─────────────────────",
+        rolling_results["test_year"].nunique(),
+    )
+    rolling_summary = (
+        rolling_results.groupby("model")[["rmse", "spearman"]]
+        .agg(["mean", "std"])
+        .sort_values(("spearman", "mean"), ascending=False)
+    )
+    for model_name, metrics in rolling_summary.iterrows():
+        logger.info(
+            "  %-20s | RMSE: %.3f +/- %.3f | Spearman: %.3f +/- %.3f",
+            model_name,
+            metrics[("rmse", "mean")],
+            metrics[("rmse", "std")],
+            metrics[("spearman", "mean")],
+            metrics[("spearman", "std")],
+        )
+
     logger.info("\n── Regression ────────────────────────────────────────────────")
-    candidates = {
-        "Ridge":             Ridge(alpha=1.0),
-        "Random Forest":     RandomForestRegressor(n_estimators=200, max_depth=10, random_state=42),
-        "Gradient Boosting": GradientBoostingRegressor(n_estimators=200, max_depth=5, random_state=42),
-    }
+    candidates = _regression_candidates()
 
     best_model = None
     best_name  = ""
