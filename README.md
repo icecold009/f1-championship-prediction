@@ -40,6 +40,10 @@ and result files are regenerated locally and ignored by Git. The evaluation comm
 and per-season detail CSVs under `results/`. See [MODEL_CARD.md](MODEL_CARD.md) for intended use,
 limitations, and the evaluation protocol.
 
+For a validated release bundle with provenance metadata, run
+`python scripts/build_release.py --download --year 2023`. See [RELEASE.md](RELEASE.md) for the
+local checklist and the manual GitHub Actions artifact workflow.
+
 ## Tests
 
 Run the unit tests locally with:
