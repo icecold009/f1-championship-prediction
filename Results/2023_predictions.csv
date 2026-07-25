@@ -1,23 +1,23 @@
 Predicted Rank,Driver,Team,Predicted Tier,Predicted Score,Actual Position,Actual Points
-1,Max Verstappen,Red Bull,Champion,1.11,1.0,575.0
-2,Sergio Pérez,Red Bull,Podium,3.22,2.0,285.0
-3,Lewis Hamilton,Mercedes,Top 5,3.97,3.0,234.0
-4,Fernando Alonso,Aston Martin,Top 5,4.09,4.0,206.0
-5,Charles Leclerc,Ferrari,Top 5,4.73,5.0,206.0
-6,Lando Norris,McLaren,Top 10,5.16,6.0,205.0
-7,Carlos Sainz,Ferrari,Top 10,6.31,7.0,200.0
-8,George Russell,Mercedes,Top 10,7.19,8.0,175.0
-9,Oscar Piastri,McLaren,Top 10,9.03,9.0,97.0
-10,Lance Stroll,Aston Martin,Top 10,10.01,10.0,74.0
-11,Pierre Gasly,Alpine F1 Team,Midfield,10.85,11.0,62.0
-12,Esteban Ocon,Alpine F1 Team,Midfield,11.02,12.0,58.0
-13,Alexander Albon,Williams,Midfield,13.18,13.0,27.0
-14,Valtteri Bottas,Alfa Romeo,Midfield,15.34,15.0,10.0
-15,Yuki Tsunoda,AlphaTauri,Midfield,15.41,14.0,17.0
-16,Nico Hülkenberg,Haas F1 Team,Backmarker,16.23,16.0,9.0
-17,Daniel Ricciardo,AlphaTauri,Backmarker,16.75,17.0,6.0
-18,Guanyu Zhou,Alfa Romeo,Backmarker,17.09,18.0,6.0
-19,Kevin Magnussen,Haas F1 Team,Backmarker,17.69,19.0,3.0
-20,Liam Lawson,AlphaTauri,Backmarker,18.41,20.0,2.0
-21,Logan Sargeant,Williams,Backmarker,19.55,21.0,1.0
-22,Nyck de Vries,AlphaTauri,Backmarker,23.04,22.0,0.0
+1,Max Verstappen,Red Bull,Champion,1.64,1.0,575.0
+2,Sergio Pérez,Red Bull,Top 5,3.0,2.0,285.0
+3,Lewis Hamilton,Mercedes,Top 5,4.4,3.0,234.0
+4,Fernando Alonso,Aston Martin,Top 5,4.45,4.0,206.0
+5,Lando Norris,McLaren,Top 5,4.89,6.0,205.0
+6,Charles Leclerc,Ferrari,Top 5,4.9,5.0,206.0
+7,Carlos Sainz,Ferrari,Top 10,6.12,7.0,200.0
+8,George Russell,Mercedes,Top 10,7.16,8.0,175.0
+9,Oscar Piastri,McLaren,Top 10,8.92,9.0,97.0
+10,Lance Stroll,Aston Martin,Top 10,10.1,10.0,74.0
+11,Pierre Gasly,Alpine F1 Team,Top 10,10.61,11.0,62.0
+12,Esteban Ocon,Alpine F1 Team,Top 10,10.87,12.0,58.0
+13,Alexander Albon,Williams,Midfield,13.36,13.0,27.0
+14,Daniel Ricciardo,AlphaTauri,Midfield,14.05,17.0,6.0
+15,Yuki Tsunoda,AlphaTauri,Midfield,14.96,14.0,17.0
+16,Guanyu Zhou,Alfa Romeo,Backmarker,15.11,18.0,6.0
+17,Valtteri Bottas,Alfa Romeo,Backmarker,15.58,15.0,10.0
+18,Nico Hülkenberg,Haas F1 Team,Backmarker,17.04,16.0,9.0
+19,Liam Lawson,AlphaTauri,Backmarker,18.73,20.0,2.0
+20,Logan Sargeant,Williams,Backmarker,19.8,21.0,1.0
+21,Nyck de Vries,AlphaTauri,Backmarker,21.16,22.0,0.0
+22,Kevin Magnussen,Haas F1 Team,Backmarker,22.45,19.0,3.0

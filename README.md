@@ -110,18 +110,28 @@ Key feature engineering ideas:
 
 ## Model Results
 
-All models trained on 80% of seasons, tested on 20% holdout. 
+Models trained on seasons 1950–2019 and evaluated on the latest five seasons (2020–2024).
+Cross-validation groups rows by season to avoid leakage across seasons.
 Ranking quality measured with Spearman correlation (higher = better predicted order).
 
 | Model | CV RMSE | R² | Spearman ρ |
 |---|---|---|---|
-| Ridge Regression | 10.395 | 0.769 | 0.898 |
-| Random Forest Regressor | 8.789 | 0.847 | 0.951 |
-| Gradient Boosting Regressor | 8.975 | 0.854 | 0.949 |
+| Ridge Regression | 10.511 | -0.391 | 0.777 |
+| Random Forest Regressor | 9.174 | 0.798 | 0.973 |
+| Gradient Boosting Regressor | 9.348 | 0.773 | 0.976 |
 
-**Best model:** Random Forest — selected by highest Spearman ρ (0.951).
+**Best model:** Gradient Boosting — selected by highest Spearman ρ (0.976).
 
-**Tier Classifier (Random Forest):** CV Accuracy 0.851 | Test Accuracy 0.849
+**Tier Classifier (Random Forest):** Grouped CV Accuracy 0.857 | Test Accuracy 0.728 | Test Macro F1 0.681
+
+| Tier | Test F1 |
+|---|---:|
+| Champion | 0.800 |
+| Podium | 0.632 |
+| Top 5 | 0.381 |
+| Top 10 | 0.691 |
+| Midfield | 0.680 |
+| Backmarker | 0.904 |
 
 ---
 
@@ -129,16 +139,16 @@ Ranking quality measured with Spearman correlation (higher = better predicted or
 
 | Rank | Feature | Importance |
 |---|---|---|
-| 1 | points_sum | 0.266095 |
-| 2 | points_per_race | 0.247010 |
-| 3 | avg_finish_pos | 0.173354 |
-| 4 | team_final_position | 0.164472 |
-| 5 | std_finish_pos | 0.026965 |
-| 6 | avg_grid_pos | 0.026899 |
-| 7 | prev_season_points | 0.023409 |
-| 8 | prev_season_avg_pos | 0.020578 |
-| 9 | quali_to_race_delta | 0.019210 |
-| 10 | races_started | 0.015752 |
+| 1 | points_sum | 0.362626 |
+| 2 | avg_finish_pos | 0.177251 |
+| 3 | team_final_position | 0.163500 |
+| 4 | points_per_race | 0.145328 |
+| 5 | races_started | 0.035875 |
+| 6 | prev_season_points | 0.023919 |
+| 7 | std_finish_pos | 0.020127 |
+| 8 | quali_to_race_delta | 0.018182 |
+| 9 | prev_season_avg_pos | 0.017307 |
+| 10 | team_final_points | 0.016320 |
 
 ## Tech Stack
 

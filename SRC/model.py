@@ -5,8 +5,8 @@ import pandas as pd
 from scipy.stats import spearmanr
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, GradientBoostingRegressor
 from sklearn.linear_model import Ridge
-from sklearn.model_selection import cross_val_score, train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.model_selection import GroupKFold, cross_val_score
+from sklearn.metrics import classification_report, mean_squared_error, r2_score
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 BASE_DIR  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -32,6 +32,8 @@ FEATURE_COLUMNS = [
     "prev_season_avg_pos",
     "prev_season_win_rate",
 ]
+
+TIER_LABELS = ["Champion", "Podium", "Top 5", "Top 10", "Midfield", "Backmarker"]
 
 def assign_tier(pos):
     if pd.isna(pos):
@@ -61,13 +63,25 @@ def train_model():
     df = df.dropna(subset=["champ_position"])
     print(f"Loaded {len(df)} rows across {df['year'].nunique()} seasons ({df['year'].min()}–{df['year'].max()})")
 
-    X      = df[FEATURE_COLUMNS].fillna(0)
-    y_reg  = df["champ_position"]
-    y_tier = df["champ_position"].apply(assign_tier)
+    test_years = sorted(df["year"].unique())[-5:]
+    test_start_year = test_years[0]
+    train_df = df[df["year"] < test_start_year]
+    test_df = df[df["year"] >= test_start_year]
 
-    X_train, X_test, y_train, y_test, yt_train, yt_test = train_test_split(
-        X, y_reg, y_tier, test_size=0.2, random_state=42
+    print(
+        f"Time-based split: train seasons {train_df['year'].min()}–{train_df['year'].max()} "
+        f"({train_df['year'].nunique()} seasons), test seasons {test_df['year'].min()}–{test_df['year'].max()} "
+        f"({test_df['year'].nunique()} seasons)"
     )
+
+    X_train = train_df[FEATURE_COLUMNS].fillna(0)
+    X_test = test_df[FEATURE_COLUMNS].fillna(0)
+    y_train = train_df["champ_position"]
+    y_test = test_df["champ_position"]
+    yt_train = train_df["champ_position"].apply(assign_tier)
+    yt_test = test_df["champ_position"].apply(assign_tier)
+    train_groups = train_df["year"]
+    group_cv = GroupKFold(n_splits=5)
 
     # ── Regression models ─────────────────────────────────────────────────
     print("\n── Regression ────────────────────────────────────────────────")
@@ -82,7 +96,14 @@ def train_model():
     best_spearman = -999
 
     for name, m in candidates.items():
-        cv = cross_val_score(m, X_train, y_train, cv=5, scoring="neg_mean_squared_error")
+        cv = cross_val_score(
+            m,
+            X_train,
+            y_train,
+            cv=group_cv,
+            groups=train_groups,
+            scoring="neg_mean_squared_error",
+        )
         cv_rmse = float(np.sqrt(-cv.mean()))
 
         m.fit(X_train, y_train)
@@ -108,10 +129,31 @@ def train_model():
     # ── Tier classifier ───────────────────────────────────────────────────
     print("\n── Classification ────────────────────────────────────────────")
     clf = RandomForestClassifier(n_estimators=200, max_depth=8, random_state=42)
-    cv_clf = cross_val_score(clf, X_train, yt_train, cv=5, scoring="accuracy")
+    cv_clf = cross_val_score(
+        clf,
+        X_train,
+        yt_train,
+        cv=group_cv,
+        groups=train_groups,
+        scoring="accuracy",
+    )
     clf.fit(X_train, yt_train)
+    yt_pred = clf.predict(X_test)
     test_acc = clf.score(X_test, yt_test)
-    print(f"  Tier Classifier | CV Acc: {cv_clf.mean():.3f} | Test Acc: {test_acc:.3f}")
+    report = classification_report(
+        yt_test,
+        yt_pred,
+        labels=TIER_LABELS,
+        output_dict=True,
+        zero_division=0,
+    )
+    print(
+        f"  Tier Classifier | Grouped CV Acc: {cv_clf.mean():.3f} | "
+        f"Test Acc: {test_acc:.3f} | Test Macro F1: {report['macro avg']['f1-score']:.3f}"
+    )
+    print("  Per-class F1:")
+    for tier in TIER_LABELS:
+        print(f"    {tier:10s} | F1: {report[tier]['f1-score']:.3f}")
 
     # ── Save ──────────────────────────────────────────────────────────────
     reg_path = os.path.join(MODEL_DIR, "championship_model.pkl")
