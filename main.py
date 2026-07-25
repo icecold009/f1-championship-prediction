@@ -2,8 +2,8 @@ import argparse
 import sys
 import os
 
-# Add SRC to path so we can import directly
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "SRC"))
+# Add src to path so we can import directly
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from data_processing import load_raw_data, create_features
 from model import train_model
@@ -28,6 +28,11 @@ def main():
         "--skip-training",
         action="store_true",
         help="Skip model training if models already exist"
+    )
+    parser.add_argument(
+        "--visualise",
+        action="store_true",
+        help="Generate the predicted-vs-actual chart after prediction"
     )
     args = parser.parse_args()
 
@@ -55,6 +60,13 @@ def main():
     print(f"STEP 3: Predicting {args.year} Championship")
     print("=" * 60)
     predict_championship(args.year)
+
+    if args.visualise:
+        print("\n" + "=" * 60)
+        print(f"STEP 4: Visualising {args.year} Championship")
+        print("=" * 60)
+        from visualise import create_visualisation
+        create_visualisation(args.year)
 
     print("\n✅  Pipeline complete!")
 

@@ -28,17 +28,16 @@ git clone https://github.com/icecold009/f1-championship-prediction.git
 cd f1-championship-prediction
 pip install -r requirements.txt
 
-# 2. Process data
-python SRC/data_processing.py
+# 2. Download the raw CSV inputs (kept out of Git)
+python scripts/download_data.py
 
-# 3. Train models
-python SRC/model.py
-
-# 4. Generate predictions
-python SRC/predict.py
+# 3. Run processing, training, prediction, and visualisation
+python main.py --year 2023 --visualise
 ```
 
-Predictions are saved to `Results/predictions.csv`.
+Predictions are saved to `results/2023_predictions.csv`; the optional chart is saved to
+`results/predicted_vs_actual_2023.png`. Processed data and result files are regenerated locally
+and ignored by Git.
 
 ## Problem Framing
 
@@ -75,11 +74,13 @@ The dataset includes (per season and per driver):
   - Points per race  
   - Podiums, wins, poles, fastest laps  
 
-Typical sources:
+The raw CSVs are downloaded from the public [Formula 1 Race Data Kaggle dataset](https://www.kaggle.com/datasets/jtrotman/formula-1-race-data), which uses the Ergast-compatible table layout expected by this project. Run `python scripts/download_data.py` to refresh them.
+
+Typical source categories:
 
 - Public F1 datasets (CSV)  
 - Ergast API exports  
-- Manually cleaned CSV files in the `data/` folder  
+- Manually cleaned CSV files in the local `data/raw/` folder
 
 ## Features & Approach
 
