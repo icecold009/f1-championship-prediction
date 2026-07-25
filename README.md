@@ -117,11 +117,11 @@ Ranking quality measured with Spearman correlation (higher = better predicted or
 |---|---|---|---|
 | Ridge Regression | 10.395 | 0.769 | 0.898 |
 | Random Forest Regressor | 8.789 | 0.847 | 0.951 |
-| Gradient Boosting Regressor | 8.975 | 0.854 | **0.949** ← best |
+| Gradient Boosting Regressor | 8.975 | 0.854 | 0.949 |
 
-**Best model:** Gradient Boosting (or whichever wins) — selected by highest Spearman ρ.
+**Best model:** Random Forest — selected by highest Spearman ρ (0.951).
 
-**Tier Classifier (Random Forest):** CV Accuracy 8.975 | Test Accuracy 0.951
+**Tier Classifier (Random Forest):** CV Accuracy 0.851 | Test Accuracy 0.849
 
 ---
 
@@ -130,9 +130,15 @@ Ranking quality measured with Spearman correlation (higher = better predicted or
 | Rank | Feature | Importance |
 |---|---|---|
 | 1 | points_sum | 0.266095 |
-| 2 | avg_finish_pos | 0.173354 |
-| 3 | points_per_race | 0.247010 |
-| ... | ... | ... |
+| 2 | points_per_race | 0.247010 |
+| 3 | avg_finish_pos | 0.173354 |
+| 4 | team_final_position | 0.164472 |
+| 5 | std_finish_pos | 0.026965 |
+| 6 | avg_grid_pos | 0.026899 |
+| 7 | prev_season_points | 0.023409 |
+| 8 | prev_season_avg_pos | 0.020578 |
+| 9 | quali_to_race_delta | 0.019210 |
+| 10 | races_started | 0.015752 |
 
 ## Tech Stack
 
