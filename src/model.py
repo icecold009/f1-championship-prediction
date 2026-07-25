@@ -8,7 +8,7 @@ import pandas as pd
 from scipy.stats import spearmanr
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, GradientBoostingRegressor
 from sklearn.linear_model import Ridge
-from sklearn.model_selection import GroupKFold, cross_val_score
+from sklearn.model_selection import GroupKFold, StratifiedGroupKFold, cross_val_score
 from sklearn.metrics import classification_report, mean_squared_error, r2_score
 
 logger = logging.getLogger(__name__)
@@ -40,11 +40,13 @@ FEATURE_COLUMNS = [
 
 TIER_LABELS = ["Champion", "Podium", "Top 5", "Top 10", "Midfield", "Backmarker"]
 
+
 def assign_tier(pos: float | int | None) -> str:
     """Map a championship position to its reporting tier."""
     if pd.isna(pos):
         return "Unknown"
     p = int(pos)
+    # These bands mirror the project’s reporting categories: champion, podium, top 5, top 10, midfield, backmarker.
     if p == 1:
         return "Champion"
     elif p <= 3:
@@ -95,6 +97,8 @@ def train_model() -> tuple[object | None, RandomForestClassifier]:
     yt_test = test_df["champ_position"].apply(assign_tier)
     train_groups = train_df["year"]
     group_cv = GroupKFold(n_splits=5)
+    # Stratify tier labels while keeping every season entirely within one fold.
+    classifier_cv = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42)
 
     # ── Regression models ─────────────────────────────────────────────────
     logger.info("\n── Regression ────────────────────────────────────────────────")
@@ -145,7 +149,7 @@ def train_model() -> tuple[object | None, RandomForestClassifier]:
         clf,
         X_train,
         yt_train,
-        cv=group_cv,
+        cv=classifier_cv,
         groups=train_groups,
         scoring="accuracy",
     )
@@ -160,7 +164,7 @@ def train_model() -> tuple[object | None, RandomForestClassifier]:
         zero_division=0,
     )
     logger.info(
-        "  Tier Classifier | Grouped CV Acc: %.3f | Test Acc: %.3f | Test Macro F1: %.3f",
+        "  Tier Classifier | Stratified Grouped CV Acc: %.3f | Test Acc: %.3f | Test Macro F1: %.3f",
         cv_clf.mean(),
         test_acc,
         report["macro avg"]["f1-score"],
