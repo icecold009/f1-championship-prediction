@@ -84,13 +84,9 @@ The dataset includes (per season and per driver):
   - Points per race  
   - Podiums, wins, poles, fastest laps  
 
-The raw CSVs are downloaded from the public [Formula 1 Race Data Kaggle dataset](https://www.kaggle.com/datasets/jtrotman/formula-1-race-data), which uses the Ergast-compatible table layout expected by this project. Run `python scripts/download_data.py` to refresh them.
+The raw CSVs are downloaded from the public [Formula 1 Race Data Kaggle dataset](https://www.kaggle.com/datasets/jtrotman/formula-1-race-data), which uses the Ergast-compatible table layout expected by this project. The local snapshot used for the reported results was pulled on **2025-01-29**, contains seasons through **2024**, and is refreshed with `python scripts/download_data.py`. Ergast’s public API was retired after the 2024 season; the linked Kaggle dataset preserves the compatible table structure while providing an auditable source for this snapshot.
 
-Typical source categories:
-
-- Public F1 datasets (CSV)  
-- Ergast API exports  
-- Manually cleaned CSV files in the local `data/raw/` folder
+The project uses this dataset as its raw-data source; the local `data/raw/` files are generated inputs and are intentionally not tracked.
 
 ## Features & Approach
 
@@ -133,7 +129,7 @@ Ranking quality measured with Spearman correlation (higher = better predicted or
 
 **Best model:** Gradient Boosting — selected by highest Spearman ρ (0.976).
 
-**Tier Classifier (Random Forest):** Grouped CV Accuracy 0.857 | Test Accuracy 0.728 | Test Macro F1 0.681
+**Tier Classifier (Random Forest):** Stratified Grouped CV Accuracy 0.858 | Test Accuracy 0.728 | Test Macro F1 0.681
 
 | Tier | Test F1 |
 |---|---:|
@@ -169,4 +165,3 @@ Ranking quality measured with Spearman correlation (higher = better predicted or
   - `pandas`, `numpy`  
   - `scikit-learn`  
   - `matplotlib`, `seaborn` (visualization)  
-  - `xgboost` (optional, if used)  
