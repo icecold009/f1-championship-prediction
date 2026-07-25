@@ -82,7 +82,7 @@ def evaluate_rolling_origin(
     test_seasons: int = ROLLING_ORIGIN_TEST_SEASONS,
     min_train_seasons: int = 20,
 ) -> pd.DataFrame:
-    """Evaluate regressors on successive future seasons.
+    """Evaluate models and historical baselines on successive future seasons.
 
     For each test season, models train only on earlier seasons. The returned
     rows retain the train cutoff so the evaluation is auditable and cannot
@@ -104,6 +104,25 @@ def evaluate_rolling_origin(
         y_train = train_df["champ_position"]
         X_test = test_df[FEATURE_COLUMNS].fillna(0)
         y_test = test_df["champ_position"]
+
+        baseline_predictions = {
+            "Baseline: previous avg finish": test_df[
+                "prev_season_avg_finish_pos"
+            ].fillna(y_train.median()),
+            "Baseline: previous points rank": test_df[
+                "prev_season_points_sum"
+            ].fillna(0).rank(method="first", ascending=False),
+        }
+        for name, predictions in baseline_predictions.items():
+            rows.append(
+                {
+                    "test_year": test_year,
+                    "train_end_year": train_years[-1],
+                    "model": name,
+                    "rmse": float(np.sqrt(mean_squared_error(y_test, predictions))),
+                    "spearman": get_spearman(y_test, predictions),
+                }
+            )
 
         for name, model in _regression_candidates().items():
             model.fit(X_train, y_train)  # type: ignore[attr-defined]
@@ -158,7 +177,7 @@ def train_model() -> tuple[object | None, RandomForestClassifier]:
     # ── Regression models ─────────────────────────────────────────────────
     rolling_results = evaluate_rolling_origin(df)
     logger.info(
-        "\n── Rolling-origin backtest (%s seasons) ─────────────────────",
+        "\n── Rolling-origin backtest (%s seasons; baselines included) ───",
         rolling_results["test_year"].nunique(),
     )
     rolling_summary = (

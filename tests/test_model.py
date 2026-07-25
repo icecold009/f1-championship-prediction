@@ -49,7 +49,13 @@ def test_rolling_origin_keeps_test_seasons_after_training_cutoff():
 
     assert set(results["test_year"]) == {2014, 2015}
     assert (results["train_end_year"] < results["test_year"]).all()
-    assert set(results["model"]) == {"Ridge", "Random Forest", "Gradient Boosting"}
+    assert set(results["model"]) == {
+        "Ridge",
+        "Random Forest",
+        "Gradient Boosting",
+        "Baseline: previous avg finish",
+        "Baseline: previous points rank",
+    }
 
 
 def test_load_models_reports_missing_artifacts(tmp_path, monkeypatch):

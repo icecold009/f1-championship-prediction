@@ -122,11 +122,17 @@ Each regressor was retrained before each test season from **2015–2024**, using
 only seasons earlier than that test season. Values below are the mean and
 standard deviation across the ten chronological test seasons.
 
-| Model | Mean RMSE | RMSE SD | Mean Spearman | Spearman SD |
+| Model / baseline | Mean RMSE | RMSE SD | Mean Spearman | Spearman SD |
 |---|---:|---:|---:|---:|
+| Baseline: previous points rank | 3.758 | 0.747 | 0.821 | 0.081 |
 | Random Forest | 6.657 | 2.818 | 0.808 | 0.061 |
 | Gradient Boosting | 6.888 | 2.747 | 0.788 | 0.057 |
+| Baseline: previous avg finish | 4.564 | 0.875 | 0.783 | 0.085 |
 | Ridge | 11.921 | 2.317 | 0.686 | 0.102 |
+
+In this evaluation snapshot, the previous-season points-rank baseline outperforms
+the ML regressors. That is a useful result: future model changes must beat this
+reference before they can be described as adding predictive value.
 
 The fixed 2020–2024 holdout below is retained as the headline comparison;
 the rolling-origin results show how stable performance is across multiple
