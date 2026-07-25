@@ -29,11 +29,15 @@ python scripts/download_data.py
 
 # 3. Run processing, training, prediction, and visualisation
 python main.py --year 2023 --visualise
+
+# 4. Re-run the auditable rolling-origin evaluation independently
+python scripts/evaluate.py
 ```
 
 Predictions are saved to `results/2023_predictions.csv`; the optional chart is saved to
 `results/predicted_vs_actual_2023.png`. Processed data and result files are regenerated locally
-and ignored by Git.
+and ignored by Git. The evaluation command writes summary and per-season detail CSVs under
+`results/`. See [MODEL_CARD.md](MODEL_CARD.md) for intended use, limitations, and the evaluation protocol.
 
 ## Tests
 
