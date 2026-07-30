@@ -234,7 +234,7 @@ seasons, so that result is not conclusive.
 | 2015 | 2014 | 11.257 | 7.503 | 0.728 |
 | 2016 | 2015 | 10.470 | 6.028 | 0.867 |
 | 2019 | 2018 | 8.562 | 6.006 | 0.760 |
-| 2021 | 2020 | 8.791 | 4.168 | 0.885 |
+| 2020 | 2019 | 5.061 | 4.245 | 0.755 |
 | 2022 | 2021 | 5.277 | 4.123 | 0.848 |
 
 The 2022 regulation-change case is a useful stress test, but it is not the
