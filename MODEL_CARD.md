@@ -98,6 +98,20 @@ Tier classification walk-forward metrics:
 | Midfield | 10 | 0.273 | 0.214 |
 | Backmarker | 10 | 0.684 | 0.138 |
 
+## Uncertainty estimates
+
+The user-facing forecast fits 100 season-level bootstrap Random Forests. Each
+bootstrap samples historical seasons with replacement, never mixing a forecast
+season into training. For each driver, the prediction artifact reports the
+empirical frequency of finishing champion, in the top three, and in the top five
+across those bootstrap rankings, together with a position standard deviation and
+P05–P95 interval.
+
+These values quantify uncertainty from the historical training sample. They are
+not calibrated probabilities, prediction intervals with guaranteed coverage, or
+betting odds; the model does not claim that a 62% bootstrap frequency equals a
+62% real-world chance.
+
 ## Limitations and risks
 
 - The dataset is a historical snapshot and may contain source corrections,
@@ -106,7 +120,8 @@ Tier classification walk-forward metrics:
   prior-season values are currently imputed with zero for model inputs.
 - Constructor identity is based on the first observed current-season race for
   historical reconstruction, which is an approximation of pre-season context.
-- The model does not provide calibrated uncertainty intervals.
+- Bootstrap position intervals are empirical and are not calibrated uncertainty
+  intervals with guaranteed coverage.
 - The evaluation covers historical seasons and should not be treated as proof
   of performance on a future regulation era.
 

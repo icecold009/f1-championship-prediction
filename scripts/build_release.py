@@ -61,7 +61,7 @@ def build_release(year: int = 2023, download: bool = False) -> Path:
     logger.info("Building processed features")
     features = create_features(*load_raw_data())
     logger.info("Training saved models")
-    train_model()
+    train_model(forecast_year=year)
     logger.info("Generating prediction and report artifacts")
     prediction = predict_championship(year)
     if prediction is None:

@@ -76,7 +76,7 @@ def main() -> int:
         logger.info("\n%s", "=" * 60)
         logger.info("STEP 2: Model Training")
         logger.info("%s", "=" * 60)
-        train_model()
+        train_model(forecast_year=args.year)
 
     # ── Step 3: Prediction ─────────────────────────────────────────────────
     logger.info("\n%s", "=" * 60)

@@ -27,7 +27,18 @@ def test_validate_release_accepts_complete_artifact_layout(tmp_path):
     (models_dir / "championship_model.pkl").touch()
     (models_dir / "tier_classifier.pkl").touch()
     pd.DataFrame(
-        {"Predicted Rank": [1], "Driver": ["Driver"], "Predicted Position": [1.0]}
+        {
+            "Predicted Rank": [1],
+            "Driver": ["Driver"],
+            "Predicted Position": [1.0],
+            "Bootstrap Runs": [100],
+            "Bootstrap Position SD": [0.2],
+            "Bootstrap Position P05": [0.8],
+            "Bootstrap Position P95": [1.2],
+            "Champion Probability": [0.5],
+            "Top 3 Probability": [0.8],
+            "Top 5 Probability": [0.9],
+        }
     ).to_csv(results_dir / "2023_predictions.csv", index=False)
     for filename in (
         "predicted_vs_actual_2023.png",

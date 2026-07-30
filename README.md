@@ -173,22 +173,50 @@ the training cutoff for every row is retained in
 `results/rolling_origin_summary_details.csv` and
 `results/tier_rolling_origin_summary_details.csv`.
 
+### Prediction uncertainty
+
+The user-facing forecast also fits **100 season-level bootstrap Random Forests**
+using only seasons before the forecast year. For every driver,
+`results/2023_predictions.csv` and the HTML report include:
+
+- `Champion Probability`, `Top 3 Probability`, and `Top 5 Probability`: the
+  fraction of bootstrap rankings placing that driver in each outcome set.
+- `Bootstrap Position P05` and `Bootstrap Position P95`: the central 90%
+  interval of predicted positions.
+- `Bootstrap Position SD`: the spread of predicted positions.
+
+These are empirical model-uncertainty estimates, not calibrated betting odds or
+guaranteed real-world probabilities. The full per-driver distribution summary is
+shown in the generated report; the number of bootstrap runs is recorded in the
+prediction CSV.
+
+For the regenerated 2023 artifact, the leading point-forecast rows are:
+
+| Driver | Point rank | Champion | Top 3 | Position P05–P95 |
+|---|---:|---:|---:|---:|
+| Max Verstappen | 1 | 99% | 100% | 1.88–3.73 |
+| Carlos Sainz | 2 | 0% | 44% | 3.92–7.39 |
+| Charles Leclerc | 3 | 1% | 65% | 3.57–7.01 |
+| Sergio Pérez | 4 | 0% | 64% | 3.98–6.41 |
+
+The CSV and HTML report include the same uncertainty fields for every driver.
+
 ---
 
 ## Feature Importance (Predeclared Random Forest)
 
 | Rank | Feature | Importance |
 |---|---|---|
-| 1 | prev_season_races_started | 0.504747 |
-| 2 | prev_team_final_position | 0.132477 |
-| 3 | prev_season_avg_grid_pos | 0.074579 |
-| 4 | prev_season_avg_finish_pos | 0.056302 |
-| 5 | prev_season_quali_to_race_delta | 0.056148 |
-| 6 | prev_team_final_points | 0.052832 |
-| 7 | prev_season_points_sum | 0.050951 |
-| 8 | prev_season_std_finish_pos | 0.032967 |
-| 9 | prev_season_points_per_race | 0.018516 |
-| 10 | prev_season_dnf_rate | 0.013810 |
+| 1 | prev_season_races_started | 0.508173 |
+| 2 | prev_team_final_position | 0.133599 |
+| 3 | prev_season_avg_grid_pos | 0.073407 |
+| 4 | prev_season_avg_finish_pos | 0.055272 |
+| 5 | prev_season_quali_to_race_delta | 0.055053 |
+| 6 | prev_season_points_sum | 0.052092 |
+| 7 | prev_team_final_points | 0.052020 |
+| 8 | prev_season_std_finish_pos | 0.032530 |
+| 9 | prev_season_points_per_race | 0.018175 |
+| 10 | prev_season_dnf_rate | 0.012942 |
 
 ## Tech Stack
 

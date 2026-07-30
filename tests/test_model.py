@@ -11,6 +11,7 @@ from src.model import (
     evaluate_tier_rolling_origin,
     get_spearman,
     previous_season_final_order,
+    bootstrap_position_predictions,
 )
 
 
@@ -43,6 +44,32 @@ def test_previous_season_final_order_is_an_explicit_naive_baseline():
     test_df = pd.DataFrame({"prev_season_points_sum": [100.0, 50.0, np.nan]})
 
     assert previous_season_final_order(test_df).tolist() == [1.0, 2.0, 3.0]
+
+
+def test_bootstrap_position_predictions_returns_rank_probabilities_without_leakage():
+    rows = []
+    for year in range(2010, 2015):
+        for driver_id, position in [(1, 1), (2, 2)]:
+            row = {
+                "year": year,
+                "driverId": driver_id,
+                "champ_position": position,
+            }
+            row.update({column: float(driver_id) for column in FEATURE_COLUMNS})
+            rows.append(row)
+    frame = pd.DataFrame(rows)
+
+    uncertainty = bootstrap_position_predictions(
+        frame[frame["year"] < 2014],
+        frame[frame["year"] == 2014],
+        n_bootstrap=4,
+        n_estimators=3,
+    )
+
+    assert len(uncertainty) == 2
+    assert (uncertainty["bootstrap_runs"] == 4).all()
+    assert uncertainty["champion_probability"].sum() == pytest.approx(1.0)
+    assert uncertainty["top_3_probability"].sum() == pytest.approx(2.0)
 
 
 def test_rolling_origin_keeps_test_seasons_after_training_cutoff():

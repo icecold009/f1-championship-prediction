@@ -88,6 +88,77 @@ def previous_season_final_order(test_df: pd.DataFrame) -> pd.Series:
     )
 
 
+def bootstrap_position_predictions(
+    train_df: pd.DataFrame,
+    test_df: pd.DataFrame,
+    n_bootstrap: int = 100,
+    n_estimators: int = 200,
+    random_state: int = 42,
+) -> pd.DataFrame:
+    """Estimate position uncertainty with season-level bootstrap models.
+
+    Whole historical seasons are sampled with replacement for each fit. This
+    preserves within-season rows and rejects any train/test season overlap.
+    Returned probabilities are the share of bootstrap rankings placing each
+    driver first, in the top three, or in the top five.
+    """
+    if n_bootstrap < 2:
+        raise ValueError("n_bootstrap must be at least 2")
+    if n_estimators < 1:
+        raise ValueError("n_estimators must be positive")
+
+    train_seasons = sorted(int(year) for year in train_df["year"].unique())
+    test_seasons = sorted(int(year) for year in test_df["year"].unique())
+    if not train_seasons or not test_seasons:
+        raise ValueError("Bootstrap training and test data must contain seasons")
+    if set(train_seasons).intersection(test_seasons):
+        raise ValueError("Bootstrap train and test seasons must not overlap")
+    if max(train_seasons) >= min(test_seasons):
+        raise ValueError("Bootstrap training seasons must precede test seasons")
+
+    rng = np.random.default_rng(random_state)
+    X_test = test_df[FEATURE_COLUMNS].fillna(0)
+    bootstrap_predictions = np.empty((n_bootstrap, len(test_df)), dtype=float)
+
+    season_rows = {
+        season: train_df[train_df["year"] == season]
+        for season in train_seasons
+    }
+    for run in range(n_bootstrap):
+        sampled_seasons = rng.choice(
+            train_seasons, size=len(train_seasons), replace=True
+        )
+        sampled_train = pd.concat(
+            [season_rows[season] for season in sampled_seasons],
+            ignore_index=True,
+        )
+        model = RandomForestRegressor(
+            n_estimators=n_estimators,
+            max_depth=10,
+            random_state=random_state + run,
+            n_jobs=-1,
+        )
+        model.fit(sampled_train[FEATURE_COLUMNS].fillna(0), sampled_train["champ_position"])
+        bootstrap_predictions[run] = model.predict(X_test)
+
+    bootstrap_ranks = pd.DataFrame(bootstrap_predictions).rank(
+        axis=1, method="first", ascending=True
+    )
+    return pd.DataFrame(
+        {
+            "bootstrap_runs": n_bootstrap,
+            "bootstrap_position_mean": bootstrap_predictions.mean(axis=0),
+            "bootstrap_position_sd": bootstrap_predictions.std(axis=0, ddof=1),
+            "bootstrap_position_p05": np.quantile(bootstrap_predictions, 0.05, axis=0),
+            "bootstrap_position_p95": np.quantile(bootstrap_predictions, 0.95, axis=0),
+            "champion_probability": (bootstrap_ranks == 1).mean(axis=0).to_numpy(),
+            "top_3_probability": (bootstrap_ranks <= 3).mean(axis=0).to_numpy(),
+            "top_5_probability": (bootstrap_ranks <= 5).mean(axis=0).to_numpy(),
+        },
+        index=test_df.index,
+    )
+
+
 def _rolling_cutoffs(
     df: pd.DataFrame,
     test_seasons: int,
@@ -230,21 +301,31 @@ def evaluate_tier_rolling_origin(
     return pd.DataFrame(rows)
 
 
-def train_model() -> tuple[object | None, RandomForestClassifier]:
-    """Train, evaluate, and save the regression and tier-classification models."""
+def train_model(
+    forecast_year: int | None = None,
+) -> tuple[object | None, RandomForestClassifier]:
+    """Train, evaluate, and save models without using the forecast season."""
     # ── Load ──────────────────────────────────────────────────────────────
     features_path = os.path.join(PROC_DIR, "features.csv")
     df = pd.read_csv(features_path)
     df = df.dropna(subset=["champ_position"])
     logger.info("Loaded %s rows across %s seasons (%s–%s)", len(df), df["year"].nunique(), df["year"].min(), df["year"].max())
 
-    test_years = sorted(df["year"].unique())[-5:]
-    test_start_year = test_years[0]
-    train_df = df[df["year"] < test_start_year]
-    test_df = df[df["year"] >= test_start_year]
+    if forecast_year is None:
+        test_years = sorted(df["year"].unique())[-5:]
+        train_df = df[df["year"] < test_years[0]]
+        test_df = df[df["year"] >= test_years[0]]
+        forecast_label = f"latest five-season holdout beginning {test_years[0]}"
+    else:
+        train_df = df[df["year"] < forecast_year]
+        test_df = df[df["year"] == forecast_year]
+        forecast_label = f"forecast year {forecast_year}"
+    if train_df.empty:
+        raise ValueError(f"No training seasons are available before {forecast_year}.")
 
     logger.info(
-        "Time-based split: train seasons %s–%s (%s seasons), test seasons %s–%s (%s seasons)",
+        "Time-based split (%s): train seasons %s–%s (%s seasons), test seasons %s–%s (%s seasons)",
+        forecast_label,
         train_df["year"].min(),
         train_df["year"].max(),
         train_df["year"].nunique(),

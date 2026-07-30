@@ -6,6 +6,11 @@ import pandas as pd
 from scipy.stats import spearmanr
 from typing import Any
 
+try:
+    from src.model import bootstrap_position_predictions
+except ModuleNotFoundError:  # pragma: no cover - CLI path adds src directly
+    from model import bootstrap_position_predictions
+
 logger = logging.getLogger(__name__)
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
@@ -14,6 +19,8 @@ PROC_DIR    = os.path.join(BASE_DIR, "data", "processed")
 RAW_DIR     = os.path.join(BASE_DIR, "data", "raw")
 MODEL_DIR   = os.path.join(BASE_DIR, "models")
 RESULTS_DIR = os.path.join(BASE_DIR, "results")
+BOOTSTRAP_RUNS = 100
+BOOTSTRAP_ESTIMATORS = 200
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
 FEATURE_COLUMNS = [
@@ -80,10 +87,21 @@ def predict_championship(year: int) -> pd.DataFrame | None:
         on="constructorId", how="left"
     )
 
-    # ── Predict ───────────────────────────────────────────────────────────
+    # ── Predict with point model and season-level bootstrap uncertainty ───
     X = season_df[FEATURE_COLUMNS].fillna(0)
     season_df["predicted_position"] = reg_model.predict(X)
     season_df["predicted_tier"]     = clf_model.predict(X)
+
+    train_df = df[df["year"] < year].dropna(subset=["champ_position"])
+    uncertainty = bootstrap_position_predictions(
+        train_df,
+        season_df,
+        n_bootstrap=BOOTSTRAP_RUNS,
+        n_estimators=BOOTSTRAP_ESTIMATORS,
+        random_state=42,
+    )
+    for column in uncertainty.columns:
+        season_df[column] = uncertainty[column].to_numpy()
 
     # Rank by predicted position (lowest number = champion)
     season_df = season_df.sort_values("predicted_position").reset_index(drop=True)
@@ -98,6 +116,14 @@ def predict_championship(year: int) -> pd.DataFrame | None:
         "predicted_position",
         "champ_position",
         "champ_points",
+        "bootstrap_runs",
+        "bootstrap_position_mean",
+        "bootstrap_position_sd",
+        "bootstrap_position_p05",
+        "bootstrap_position_p95",
+        "champion_probability",
+        "top_3_probability",
+        "top_5_probability",
     ]].copy()
 
     output.columns = [
@@ -108,8 +134,26 @@ def predict_championship(year: int) -> pd.DataFrame | None:
         "Predicted Position",
         "Actual Position",
         "Actual Points",
+        "Bootstrap Runs",
+        "Bootstrap Position Mean",
+        "Bootstrap Position SD",
+        "Bootstrap Position P05",
+        "Bootstrap Position P95",
+        "Champion Probability",
+        "Top 3 Probability",
+        "Top 5 Probability",
     ]
     output["Predicted Position"] = output["Predicted Position"].round(2)
+    for column in (
+        "Bootstrap Position Mean",
+        "Bootstrap Position SD",
+        "Bootstrap Position P05",
+        "Bootstrap Position P95",
+        "Champion Probability",
+        "Top 3 Probability",
+        "Top 5 Probability",
+    ):
+        output[column] = output[column].round(4)
 
     # ── Spearman vs actual (only if actual data available) ────────────────
     has_actual = output["Actual Position"].notna().sum() > 3

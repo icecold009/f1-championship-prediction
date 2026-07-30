@@ -35,6 +35,7 @@ Before sharing a report:
 - Review `release_manifest.json` for the intended commit and data snapshot.
 - Confirm the rolling baseline comparison is included.
 - Confirm the tier accuracy, macro F1, and per-tier F1 tables are included.
+- Confirm the bootstrap uncertainty table and run count are included.
 - State that the report is historical analysis, not a live or betting system.
 
 ## Monitoring boundary

@@ -57,7 +57,18 @@ def validate_release(base_dir: Path = BASE_DIR, year: int = 2023) -> list[str]:
         errors.append(f"Missing prediction artifact: results/{year}_predictions.csv")
     else:
         predictions = pd.read_csv(prediction_path, nrows=1)
-        required_prediction_columns = {"Predicted Rank", "Driver", "Predicted Position"}
+        required_prediction_columns = {
+            "Predicted Rank",
+            "Driver",
+            "Predicted Position",
+            "Bootstrap Runs",
+            "Bootstrap Position SD",
+            "Bootstrap Position P05",
+            "Bootstrap Position P95",
+            "Champion Probability",
+            "Top 3 Probability",
+            "Top 5 Probability",
+        }
         missing_prediction_columns = sorted(
             required_prediction_columns - set(predictions.columns)
         )

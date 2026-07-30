@@ -81,12 +81,47 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
 
     top_driver = str(predictions.iloc[0]["Driver"])
     top_team = str(predictions.iloc[0]["Team"])
+    uncertainty_columns = [
+        "Predicted Rank",
+        "Driver",
+        "Predicted Position",
+        "Bootstrap Position SD",
+        "Bootstrap Position P05",
+        "Bootstrap Position P95",
+        "Champion Probability",
+        "Top 3 Probability",
+        "Top 5 Probability",
+    ]
+    if set(uncertainty_columns).issubset(predictions.columns):
+        uncertainty = predictions[uncertainty_columns].copy()
+        for column in (
+            "Champion Probability",
+            "Top 3 Probability",
+            "Top 5 Probability",
+        ):
+            uncertainty[column] = uncertainty[column].map(
+                lambda value: f"{float(value):.0%}"
+            )
+        uncertainty_markup = uncertainty.to_html(
+            index=False, classes="data-table", border=0, justify="left"
+        )
+        top_driver_detail = (
+            f"{float(predictions.iloc[0]['Champion Probability']):.0%} title chance; "
+            f"{float(predictions.iloc[0]['Top 3 Probability']):.0%} top-3 chance"
+        )
+    else:
+        uncertainty_markup = (
+            '<p class="muted">Rebuild the prediction artifact to include '
+            "bootstrap uncertainty estimates.</p>"
+        )
+        top_driver_detail = top_team
+
     table_markup = predictions.to_html(
         index=False, classes="data-table", border=0, justify="left"
     )
     cards = "".join(
         [
-            _card("Forecast champion", top_driver, top_team),
+            _card("Point forecast champion", top_driver, top_driver_detail),
             _card("Predicted position", f"{predictions.iloc[0]['Predicted Position']:.2f}"),
             _card("Drivers ranked", str(len(predictions))),
             _card("Spearman vs actual", correlation_text),
@@ -159,6 +194,11 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
       <h2>Tier classification</h2>
       <p>Random Forest tier metrics averaged across the same chronological test seasons. Accuracy is the fraction of correctly classified drivers; macro F1 gives each tier equal weight.</p>
       {tier_markup}
+    </section>
+    <section class="panel">
+      <h2>Bootstrap uncertainty</h2>
+      <p>Each row reports the distribution from 100 season-level bootstrap Random Forest fits. Probabilities are the fraction of bootstrap rankings placing a driver champion, in the top 3, or in the top 5; P05–P95 is the central 90% position interval.</p>
+      {uncertainty_markup}
     </section>
     <section class="panel">
       <h2>Predicted order</h2>
