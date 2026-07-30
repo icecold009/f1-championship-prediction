@@ -34,7 +34,7 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
     valid_actual = predictions.dropna(subset=["Actual Position"])
     if len(valid_actual) > 3:
         correlation = spearmanr(
-            valid_actual["Actual Position"], valid_actual["Predicted Score"]
+            valid_actual["Actual Position"], valid_actual["Predicted Position"]
         ).statistic
         correlation_text = f"{float(correlation):.3f}"
     else:
@@ -60,6 +60,25 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
             "to include rolling-origin benchmark results.</p>"
         )
 
+    tier_summary_path = RESULTS_DIR / "tier_rolling_origin_summary.csv"
+    tier_class_summary_path = RESULTS_DIR / "tier_rolling_origin_class_summary.csv"
+    if tier_summary_path.exists() and tier_class_summary_path.exists():
+        tier_summary = pd.read_csv(tier_summary_path)
+        tier_class_summary = pd.read_csv(tier_class_summary_path)
+        tier_markup = (
+            tier_summary.to_html(
+                index=False, classes="data-table", border=0, justify="left"
+            )
+            + tier_class_summary.to_html(
+                index=False, classes="data-table", border=0, justify="left"
+            )
+        )
+    else:
+        tier_markup = (
+            '<p class="muted">Run <code>python scripts/evaluate.py</code> '
+            "to include tier classification benchmark results.</p>"
+        )
+
     top_driver = str(predictions.iloc[0]["Driver"])
     top_team = str(predictions.iloc[0]["Team"])
     table_markup = predictions.to_html(
@@ -68,7 +87,7 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
     cards = "".join(
         [
             _card("Forecast champion", top_driver, top_team),
-            _card("Predicted score", f"{predictions.iloc[0]['Predicted Score']:.2f}"),
+            _card("Predicted position", f"{predictions.iloc[0]['Predicted Position']:.2f}"),
             _card("Drivers ranked", str(len(predictions))),
             _card("Spearman vs actual", correlation_text),
         ]
@@ -133,8 +152,13 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
     </section>
     <section class="panel">
       <h2>Rolling-origin evaluation</h2>
-      <p>Historical benchmark across chronological test seasons. Lower RMSE and higher Spearman are better.</p>
+      <p>Historical benchmark across chronological test seasons. Each test season is held out in full; lower RMSE is better, while higher R² and Spearman are better.</p>
       {evaluation_markup}
+    </section>
+    <section class="panel">
+      <h2>Tier classification</h2>
+      <p>Random Forest tier metrics averaged across the same chronological test seasons. Accuracy is the fraction of correctly classified drivers; macro F1 gives each tier equal weight.</p>
+      {tier_markup}
     </section>
     <section class="panel">
       <h2>Predicted order</h2>

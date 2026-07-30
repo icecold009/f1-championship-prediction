@@ -105,17 +105,17 @@ def predict_championship(year: int) -> pd.DataFrame | None:
         "Driver",
         "Team",
         "Predicted Tier",
-        "Predicted Score",
+        "Predicted Position",
         "Actual Position",
         "Actual Points",
     ]
-    output["Predicted Score"] = output["Predicted Score"].round(2)
+    output["Predicted Position"] = output["Predicted Position"].round(2)
 
     # ── Spearman vs actual (only if actual data available) ────────────────
     has_actual = output["Actual Position"].notna().sum() > 3
     if has_actual:
         valid = output.dropna(subset=["Actual Position"])
-        corr_val, _ = spearmanr(valid["Actual Position"], valid["Predicted Score"])
+        corr_val, _ = spearmanr(valid["Actual Position"], valid["Predicted Position"])
         spearman = round(float(corr_val), 3)  # type: ignore
         logger.info("\n── %s Championship Prediction ─────────────────────────────", year)
         logger.info("  Spearman rank correlation vs actual: %s", spearman)

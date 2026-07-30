@@ -27,12 +27,16 @@ def test_validate_release_accepts_complete_artifact_layout(tmp_path):
     (models_dir / "championship_model.pkl").touch()
     (models_dir / "tier_classifier.pkl").touch()
     pd.DataFrame(
-        {"Predicted Rank": [1], "Driver": ["Driver"], "Predicted Score": [1.0]}
+        {"Predicted Rank": [1], "Driver": ["Driver"], "Predicted Position": [1.0]}
     ).to_csv(results_dir / "2023_predictions.csv", index=False)
     for filename in (
         "predicted_vs_actual_2023.png",
         "f1_prediction_report_2023.html",
         "rolling_origin_summary.csv",
+        "rolling_origin_summary_details.csv",
+        "tier_rolling_origin_summary.csv",
+        "tier_rolling_origin_summary_details.csv",
+        "tier_rolling_origin_class_summary.csv",
         "release_manifest.json",
     ):
         (results_dir / filename).touch()

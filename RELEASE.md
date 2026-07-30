@@ -14,7 +14,7 @@ python scripts/check_release.py --year 2023
 ```
 
 The build regenerates features, models, predictions, the comparison chart, the
-HTML report, rolling-origin evaluation files, and
+HTML report, regression and tier rolling-origin evaluation files, and
 `results/release_manifest.json`. The manifest records the Git commit, Python
 and package versions, data snapshot, row/season counts, evaluation summary,
 and generated artifact paths.
@@ -34,6 +34,7 @@ Before sharing a report:
 - Inspect the generated HTML report and chart.
 - Review `release_manifest.json` for the intended commit and data snapshot.
 - Confirm the rolling baseline comparison is included.
+- Confirm the tier accuracy, macro F1, and per-tier F1 tables are included.
 - State that the report is historical analysis, not a live or betting system.
 
 ## Monitoring boundary

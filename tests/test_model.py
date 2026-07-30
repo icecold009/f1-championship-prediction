@@ -3,7 +3,13 @@ import pandas as pd
 import pytest
 
 from src import predict
-from src.model import FEATURE_COLUMNS, assign_tier, evaluate_rolling_origin, get_spearman
+from src.model import (
+    FEATURE_COLUMNS,
+    assign_tier,
+    evaluate_rolling_origin,
+    evaluate_tier_rolling_origin,
+    get_spearman,
+)
 
 
 @pytest.mark.parametrize(
@@ -56,6 +62,30 @@ def test_rolling_origin_keeps_test_seasons_after_training_cutoff():
         "Baseline: previous avg finish",
         "Baseline: previous points rank",
     }
+
+
+def test_tier_rolling_origin_keeps_test_seasons_after_training_cutoff():
+    rows = []
+    positions = [1, 3, 5, 10, 15, 16]
+    for year in range(2010, 2016):
+        for driver_id, position in enumerate(positions, start=1):
+            row = {
+                "year": year,
+                "driverId": driver_id,
+                "champ_position": position,
+            }
+            row.update({column: float(driver_id) for column in FEATURE_COLUMNS})
+            rows.append(row)
+
+    results = evaluate_tier_rolling_origin(
+        pd.DataFrame(rows), test_seasons=2, min_train_seasons=3
+    )
+
+    assert set(results["test_year"]) == {2014, 2015}
+    assert (results["train_end_year"] < results["test_year"]).all()
+    assert {"accuracy", "macro_f1", "f1_champion", "f1_backmarker"}.issubset(
+        results.columns
+    )
 
 
 def test_load_models_reports_missing_artifacts(tmp_path, monkeypatch):

@@ -8,8 +8,7 @@ import pandas as pd
 from scipy.stats import spearmanr
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, GradientBoostingRegressor
 from sklearn.linear_model import Ridge
-from sklearn.model_selection import GroupKFold, StratifiedGroupKFold, cross_val_score
-from sklearn.metrics import classification_report, mean_squared_error, r2_score
+from sklearn.metrics import accuracy_score, f1_score, mean_squared_error, r2_score
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +76,28 @@ def _regression_candidates() -> dict[str, object]:
     }
 
 
+def _rolling_cutoffs(
+    df: pd.DataFrame,
+    test_seasons: int,
+    min_train_seasons: int,
+) -> list[tuple[int, pd.DataFrame, pd.DataFrame, list[int]]]:
+    """Return chronological cutoffs with whole seasons kept intact."""
+    evaluation_df = df.dropna(subset=["champ_position"]).copy()
+    seasons = sorted(int(year) for year in evaluation_df["year"].unique())
+    first_test_index = max(min_train_seasons, len(seasons) - test_seasons)
+    cutoffs = []
+
+    for test_year in seasons[first_test_index:]:
+        train_df = evaluation_df[evaluation_df["year"] < test_year]
+        test_df = evaluation_df[evaluation_df["year"] == test_year]
+        train_years = sorted(int(year) for year in train_df["year"].unique())
+        if len(train_years) < min_train_seasons or test_df.empty:
+            continue
+        cutoffs.append((test_year, train_df, test_df, train_years))
+
+    return cutoffs
+
+
 def evaluate_rolling_origin(
     df: pd.DataFrame,
     test_seasons: int = ROLLING_ORIGIN_TEST_SEASONS,
@@ -88,18 +109,11 @@ def evaluate_rolling_origin(
     rows retain the train cutoff so the evaluation is auditable and cannot
     silently become a random split.
     """
-    evaluation_df = df.dropna(subset=["champ_position"]).copy()
-    seasons = sorted(int(year) for year in evaluation_df["year"].unique())
-    first_test_index = max(min_train_seasons, len(seasons) - test_seasons)
     rows: list[dict[str, float | int | str]] = []
 
-    for test_year in seasons[first_test_index:]:
-        train_df = evaluation_df[evaluation_df["year"] < test_year]
-        test_df = evaluation_df[evaluation_df["year"] == test_year]
-        train_years = sorted(int(year) for year in train_df["year"].unique())
-        if len(train_years) < min_train_seasons or test_df.empty:
-            continue
-
+    for test_year, train_df, test_df, train_years in _rolling_cutoffs(
+        df, test_seasons, min_train_seasons
+    ):
         X_train = train_df[FEATURE_COLUMNS].fillna(0)
         y_train = train_df["champ_position"]
         X_test = test_df[FEATURE_COLUMNS].fillna(0)
@@ -120,6 +134,7 @@ def evaluate_rolling_origin(
                     "train_end_year": train_years[-1],
                     "model": name,
                     "rmse": float(np.sqrt(mean_squared_error(y_test, predictions))),
+                    "r2": float(r2_score(y_test, predictions)),
                     "spearman": get_spearman(y_test, predictions),
                 }
             )
@@ -133,9 +148,68 @@ def evaluate_rolling_origin(
                     "train_end_year": train_years[-1],
                     "model": name,
                     "rmse": float(np.sqrt(mean_squared_error(y_test, predictions))),
+                    "r2": float(r2_score(y_test, predictions)),
                     "spearman": get_spearman(y_test, predictions),
                 }
             )
+
+    return pd.DataFrame(rows)
+
+
+def evaluate_tier_rolling_origin(
+    df: pd.DataFrame,
+    test_seasons: int = ROLLING_ORIGIN_TEST_SEASONS,
+    min_train_seasons: int = 20,
+) -> pd.DataFrame:
+    """Evaluate tier classification on successive future seasons.
+
+    Each row is scored only after a classifier trained on strictly earlier
+    seasons. The six class F1 values are retained for transparent reporting.
+    """
+    rows: list[dict[str, float | int | str]] = []
+
+    for test_year, train_df, test_df, train_years in _rolling_cutoffs(
+        df, test_seasons, min_train_seasons
+    ):
+        classifier = RandomForestClassifier(
+            n_estimators=200, max_depth=8, random_state=42
+        )
+        X_train = train_df[FEATURE_COLUMNS].fillna(0)
+        y_train = train_df["champ_position"].apply(assign_tier)
+        X_test = test_df[FEATURE_COLUMNS].fillna(0)
+        y_test = test_df["champ_position"].apply(assign_tier)
+
+        classifier.fit(X_train, y_train)
+        predictions = classifier.predict(X_test)
+        class_f1 = f1_score(
+            y_test,
+            predictions,
+            labels=TIER_LABELS,
+            average=None,
+            zero_division=0,
+        )
+        row: dict[str, float | int | str] = {
+            "test_year": test_year,
+            "train_end_year": train_years[-1],
+            "model": "Random Forest",
+            "accuracy": float(accuracy_score(y_test, predictions)),
+            "macro_f1": float(
+                f1_score(
+                    y_test,
+                    predictions,
+                    labels=TIER_LABELS,
+                    average="macro",
+                    zero_division=0,
+                )
+            ),
+        }
+        row.update(
+            {
+                f"f1_{tier.lower().replace(' ', '_')}": float(score)
+                for tier, score in zip(TIER_LABELS, class_f1)
+            }
+        )
+        rows.append(row)
 
     return pd.DataFrame(rows)
 
@@ -164,104 +238,53 @@ def train_model() -> tuple[object | None, RandomForestClassifier]:
     )
 
     X_train = train_df[FEATURE_COLUMNS].fillna(0)
-    X_test = test_df[FEATURE_COLUMNS].fillna(0)
     y_train = train_df["champ_position"]
-    y_test = test_df["champ_position"]
     yt_train = train_df["champ_position"].apply(assign_tier)
-    yt_test = test_df["champ_position"].apply(assign_tier)
-    train_groups = train_df["year"]
-    group_cv = GroupKFold(n_splits=5)
-    # Stratify tier labels while keeping every season entirely within one fold.
-    classifier_cv = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42)
 
-    # ── Regression models ─────────────────────────────────────────────────
+    # ── Leak-free rolling-origin metrics ──────────────────────────────────
     rolling_results = evaluate_rolling_origin(df)
     logger.info(
         "\n── Rolling-origin backtest (%s seasons; baselines included) ───",
         rolling_results["test_year"].nunique(),
     )
-    rolling_summary = (
-        rolling_results.groupby("model")[["rmse", "spearman"]]
-        .agg(["mean", "std"])
-        .sort_values(("spearman", "mean"), ascending=False)
-    )
+    rolling_summary = rolling_results.groupby("model")[["rmse", "r2", "spearman"]].agg(["mean", "std"])
     for model_name, metrics in rolling_summary.iterrows():
         logger.info(
-            "  %-20s | RMSE: %.3f +/- %.3f | Spearman: %.3f +/- %.3f",
+            "  %-24s | RMSE: %.3f +/- %.3f | R²: %.3f +/- %.3f | Spearman: %.3f +/- %.3f",
             model_name,
             metrics[("rmse", "mean")],
             metrics[("rmse", "std")],
+            metrics[("r2", "mean")],
+            metrics[("r2", "std")],
             metrics[("spearman", "mean")],
             metrics[("spearman", "std")],
         )
 
-    logger.info("\n── Regression ────────────────────────────────────────────────")
+    tier_results = evaluate_tier_rolling_origin(df)
+    tier_summary = tier_results.groupby("model").agg(
+        test_seasons=("test_year", "nunique"),
+        mean_accuracy=("accuracy", "mean"),
+        accuracy_sd=("accuracy", "std"),
+        mean_macro_f1=("macro_f1", "mean"),
+        macro_f1_sd=("macro_f1", "std"),
+    )
+    logger.info("\n── Tier classification walk-forward metrics ────────────────")
+    logger.info("\n%s", tier_summary.round(3).to_string())
+
+    # ── Predeclared regression model for the user-facing forecast ─────────
     candidates = _regression_candidates()
-
-    best_model = None
-    best_name  = ""
-    best_spearman = -999
-
-    for name, m in candidates.items():
-        cv = cross_val_score(
-            m,
-            X_train,
-            y_train,
-            cv=group_cv,
-            groups=train_groups,
-            scoring="neg_mean_squared_error",
-        )
-        cv_rmse = float(np.sqrt(-cv.mean()))
-
-        m.fit(X_train, y_train)
-        y_pred    = m.predict(X_test)
-        test_r2   = float(r2_score(y_test, y_pred))
-        test_rmse = float(np.sqrt(mean_squared_error(y_test, y_pred)))
-        sp        = get_spearman(y_test, y_pred)
-
-        logger.info("  %-20s | CV RMSE: %.3f | R²: %.3f | Spearman: %.3f", name, cv_rmse, test_r2, sp)
-
-        if sp > best_spearman:
-            best_spearman = sp
-            best_model    = m
-            best_name     = name
-
-    logger.info("\n  Best: %s (Spearman=%.3f)", best_name, best_spearman)
+    best_name = "Random Forest"
+    best_model = candidates[best_name]
+    best_model.fit(X_train, y_train)  # type: ignore[attr-defined]
+    logger.info("\n  Operational forecast model: %s (predeclared)", best_name)
 
     if best_model is not None and hasattr(best_model, "feature_importances_"):
         imp = pd.Series(best_model.feature_importances_, index=FEATURE_COLUMNS).sort_values(ascending=False)
         logger.info("\n  Top 10 features:\n%s", imp.head(10).to_string())
 
-    # ── Tier classifier ───────────────────────────────────────────────────
-    logger.info("\n── Classification ────────────────────────────────────────────")
+    # ── Tier classifier for the user-facing forecast ───────────────────────
     clf = RandomForestClassifier(n_estimators=200, max_depth=8, random_state=42)
-    cv_clf = cross_val_score(
-        clf,
-        X_train,
-        yt_train,
-        cv=classifier_cv,
-        groups=train_groups,
-        scoring="accuracy",
-    )
     clf.fit(X_train, yt_train)
-    yt_pred = clf.predict(X_test)
-    test_acc = clf.score(X_test, yt_test)
-    report = classification_report(
-        yt_test,
-        yt_pred,
-        labels=TIER_LABELS,
-        output_dict=True,
-        zero_division=0,
-    )
-    logger.info(
-        "  Tier Classifier | Stratified Grouped CV Acc: %.3f | Test Acc: %.3f | Test Macro F1: %.3f",
-        cv_clf.mean(),
-        test_acc,
-        report["macro avg"]["f1-score"],
-    )
-    logger.info("  Per-class F1:")
-    for tier in TIER_LABELS:
-        logger.info("    %-10s | F1: %.3f", tier, report[tier]["f1-score"])
 
     # ── Save ──────────────────────────────────────────────────────────────
     reg_path = os.path.join(MODEL_DIR, "championship_model.pkl")

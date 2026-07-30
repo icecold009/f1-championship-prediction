@@ -11,7 +11,7 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE_DIR / "src"))
 
 from data_processing import create_features, load_raw_data
-from model import evaluate_rolling_origin
+from model import TIER_LABELS, evaluate_rolling_origin, evaluate_tier_rolling_origin
 
 logger = logging.getLogger(__name__)
 DEFAULT_FEATURES_PATH = BASE_DIR / "data" / "processed" / "features.csv"
@@ -26,6 +26,8 @@ def summarize_results(results: pd.DataFrame) -> pd.DataFrame:
             test_seasons=("test_year", "nunique"),
             mean_rmse=("rmse", "mean"),
             rmse_sd=("rmse", "std"),
+            mean_r2=("r2", "mean"),
+            r2_sd=("r2", "std"),
             mean_spearman=("spearman", "mean"),
             spearman_sd=("spearman", "std"),
         )
@@ -33,6 +35,38 @@ def summarize_results(results: pd.DataFrame) -> pd.DataFrame:
         .sort_values("mean_spearman", ascending=False)
     )
     return summary.round(3)
+
+
+def summarize_tier_results(details: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate walk-forward tier accuracy and macro-F1 metrics."""
+    summary = (
+        details.groupby("model")
+        .agg(
+            test_seasons=("test_year", "nunique"),
+            mean_accuracy=("accuracy", "mean"),
+            accuracy_sd=("accuracy", "std"),
+            mean_macro_f1=("macro_f1", "mean"),
+            macro_f1_sd=("macro_f1", "std"),
+        )
+        .reset_index()
+    )
+    return summary.round(3)
+
+
+def summarize_tier_classes(details: pd.DataFrame) -> pd.DataFrame:
+    """Aggregate per-tier F1 values across the same chronological test seasons."""
+    rows = []
+    for tier in TIER_LABELS:
+        column = f"f1_{tier.lower().replace(' ', '_')}"
+        rows.append(
+            {
+                "tier": tier,
+                "test_seasons": details["test_year"].nunique(),
+                "mean_f1": details[column].mean(),
+                "f1_sd": details[column].std(),
+            }
+        )
+    return pd.DataFrame(rows).round(3)
 
 
 def run_evaluation(
@@ -61,15 +95,36 @@ def run_evaluation(
     if details.empty:
         raise ValueError("No rolling-origin evaluation rows were produced.")
 
+    tier_details = evaluate_tier_rolling_origin(
+        features,
+        test_seasons=test_seasons,
+        min_train_seasons=min_train_seasons,
+    )
+    if tier_details.empty:
+        raise ValueError("No tier rolling-origin evaluation rows were produced.")
+
     output_path.parent.mkdir(parents=True, exist_ok=True)
     details_path = output_path.with_name(f"{output_path.stem}_details{output_path.suffix}")
+    tier_output_path = output_path.with_name("tier_rolling_origin_summary.csv")
+    tier_details_path = output_path.with_name("tier_rolling_origin_summary_details.csv")
+    tier_class_output_path = output_path.with_name("tier_rolling_origin_class_summary.csv")
     summary = summarize_results(details)
+    tier_summary = summarize_tier_results(tier_details)
+    tier_class_summary = summarize_tier_classes(tier_details)
     summary.to_csv(output_path, index=False)
     details.to_csv(details_path, index=False)
+    tier_summary.to_csv(tier_output_path, index=False)
+    tier_details.to_csv(tier_details_path, index=False)
+    tier_class_summary.to_csv(tier_class_output_path, index=False)
 
     logger.info("Saved summary -> %s", output_path)
     logger.info("Saved per-season details -> %s", details_path)
     logger.info("\n%s", summary.to_string(index=False))
+    logger.info("Saved tier summary -> %s", tier_output_path)
+    logger.info("Saved tier per-season details -> %s", tier_details_path)
+    logger.info("Saved tier class summary -> %s", tier_class_output_path)
+    logger.info("\n%s", tier_summary.to_string(index=False))
+    logger.info("\n%s", tier_class_summary.to_string(index=False))
     return summary
 
 

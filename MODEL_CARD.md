@@ -7,10 +7,11 @@ reporting tier from historical season information. It is an educational,
 research-oriented forecasting project, not a production decision system or a
 betting recommendation.
 
-The current saved regression model is selected by Spearman rank correlation on
-the fixed 2020–2024 holdout. In the broader rolling-origin evaluation, the
+The current saved regression model is a predeclared Random Forest used for the
+user-facing forecast artifact. In the leak-free rolling-origin evaluation, the
 previous-season points-rank baseline currently outperforms the machine-learning
-models, so the model should not be described as superior to that baseline.
+models, so the Random Forest should not be described as superior to that
+baseline.
 
 ## Intended use
 
@@ -49,32 +50,49 @@ list.
 
 ## Evaluation protocol
 
-1. A fixed time split trains on 1950–2019 and evaluates on 2020–2024.
-2. Rolling-origin evaluation retrains before each test season from 2015–2024,
-   using only seasons earlier than the test season.
-3. Regression cross-validation groups rows by season.
-4. Tier classification uses grouped, stratified cross-validation and reports
-   per-class F1 because the classes are imbalanced.
+1. For each test season from 2015–2024, training uses all seasons earlier than
+   that test season.
+2. Every test season is held out in full; no rows from the test season appear in
+   training, and no random row split is used.
+3. Regression reports per-season RMSE, R², and Spearman rank correlation before
+   aggregating their means and standard deviations.
+4. Tier classification reports per-season accuracy, macro F1, and per-class F1
+   because the classes are imbalanced.
 5. The previous-season points-rank and previous-season average-finish methods
    are included as transparent baselines.
 
 ## Reported results
 
-Rolling-origin means across 2015–2024:
+Walk-forward means across 2015–2024:
 
-| Model / baseline | Mean RMSE | RMSE SD | Mean Spearman | Spearman SD |
-|---|---:|---:|---:|---:|
-| Baseline: previous points rank | 3.758 | 0.747 | 0.821 | 0.081 |
-| Random Forest | 6.657 | 2.818 | 0.808 | 0.061 |
-| Gradient Boosting | 6.888 | 2.747 | 0.788 | 0.057 |
-| Baseline: previous avg finish | 4.564 | 0.875 | 0.783 | 0.085 |
-| Ridge | 11.921 | 2.317 | 0.686 | 0.102 |
+| Model / baseline | Test seasons | Mean RMSE | RMSE SD | Mean R² | R² SD | Mean Spearman | Spearman SD |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Baseline: previous points rank | 10 | 3.758 | 0.747 | 0.641 | 0.161 | 0.821 | 0.081 |
+| Random Forest | 10 | 6.657 | 2.818 | -0.277 | 1.042 | 0.808 | 0.061 |
+| Gradient Boosting | 10 | 6.888 | 2.747 | -0.350 | 1.060 | 0.788 | 0.057 |
+| Baseline: previous avg finish | 10 | 4.564 | 0.875 | 0.462 | 0.273 | 0.783 | 0.085 |
+| Ridge | 10 | 11.921 | 2.317 | -2.648 | 1.729 | 0.686 | 0.102 |
 
 These values are regenerated with:
 
 ```bash
 python scripts/evaluate.py
 ```
+
+Tier classification walk-forward metrics:
+
+| Model | Test seasons | Mean accuracy | Accuracy SD | Mean macro F1 | Macro F1 SD |
+|---|---:|---:|---:|---:|---:|
+| Random Forest | 10 | 0.516 | 0.094 | 0.415 | 0.096 |
+
+| Tier | Test seasons | Mean F1 | F1 SD |
+|---|---:|---:|---:|
+| Champion | 10 | 0.700 | 0.292 |
+| Podium | 10 | 0.174 | 0.283 |
+| Top 5 | 10 | 0.117 | 0.249 |
+| Top 10 | 10 | 0.542 | 0.126 |
+| Midfield | 10 | 0.273 | 0.214 |
+| Backmarker | 10 | 0.684 | 0.138 |
 
 ## Limitations and risks
 
@@ -98,5 +116,5 @@ python main.py --year 2023 --visualise
 python -m pytest -q
 ```
 
-The command writes a summary CSV and per-season detail CSV under `results/`;
-these generated artifacts are intentionally ignored by Git.
+The command writes regression and tier summary CSVs plus per-season detail files
+under `results/`; these generated artifacts are intentionally ignored by Git.

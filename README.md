@@ -12,7 +12,7 @@ This project focuses on:
 - Collecting and cleaning **historical F1 data** (drivers, constructors, races, results)
 - Engineering features that represent prior-season driver performance, constructor strength, qualifying pace, and reliability
 - Training machine learning models to:
-  - Predict **final points**
+  - Predict **final championship position**
   - Predict **final position / tier** (e.g. champion, podium contender, midfield, backmarker)
 - Evaluating how well we can **forecast a season's final standings** without using that season's race outcomes as predictors.
 
@@ -56,10 +56,11 @@ The same test command runs in GitHub Actions for Python 3.12 and 3.13.
 
 ## Problem Framing
 
-There are two main prediction tasks:
+There is one primary prediction task and one derived reporting task:
 
 1. **Regression task**  
-   Predict the **final championship points** for each driver.
+   Predict the **final championship position** for each driver. The numeric
+   output is a predicted position, not predicted championship points.
 
 2. **Ranking / classification task**  
    Predict a driver’s **final standing (or tier)**, for example:
@@ -121,54 +122,54 @@ final driver standings are retained only as evaluation targets.
 
 ## Model Results
 
-Models trained on seasons 1950–2019 and evaluated on the latest five seasons (2020–2024).
-Each forecast row uses the driver's prior-season statistics and the prior final standings of the constructor they enter with. Same-season race results are used only to identify entrants and construct the final target, not as model inputs. Cross-validation groups rows by season to avoid leakage across seasons.
-Ranking quality measured with Spearman correlation (higher = better predicted order).
+Every reported metric uses the same leak-free walk-forward protocol. For each
+test season **N+1**, the model is trained on all available seasons through **N**;
+all rows from the test season remain together and never appear in training.
+The reported values are the mean and standard deviation across ten chronological
+test seasons, 2015–2024. RMSE measures position error, R² measures explained
+position variance, and Spearman ρ measures agreement in predicted order.
 
-### Rolling-origin backtest
+| Model / baseline | Test seasons | Mean RMSE | RMSE SD | Mean R² | R² SD | Mean Spearman ρ | Spearman SD |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Baseline: previous points rank | 10 | 3.758 | 0.747 | 0.641 | 0.161 | 0.821 | 0.081 |
+| Random Forest | 10 | 6.657 | 2.818 | -0.277 | 1.042 | 0.808 | 0.061 |
+| Gradient Boosting | 10 | 6.888 | 2.747 | -0.350 | 1.060 | 0.788 | 0.057 |
+| Baseline: previous avg finish | 10 | 4.564 | 0.875 | 0.462 | 0.273 | 0.783 | 0.085 |
+| Ridge | 10 | 11.921 | 2.317 | -2.648 | 1.729 | 0.686 | 0.102 |
 
-Each regressor was retrained before each test season from **2015–2024**, using
-only seasons earlier than that test season. Values below are the mean and
-standard deviation across the ten chronological test seasons.
+The previous-season points-rank baseline remains stronger than every machine
+learning regressor in this walk-forward evaluation. Random Forest is retained as
+the predeclared operational model for the generated forecast artifact; it is not
+described as the best model based on these reported test seasons.
 
-| Model / baseline | Mean RMSE | RMSE SD | Mean Spearman | Spearman SD |
-|---|---:|---:|---:|---:|
-| Baseline: previous points rank | 3.758 | 0.747 | 0.821 | 0.081 |
-| Random Forest | 6.657 | 2.818 | 0.808 | 0.061 |
-| Gradient Boosting | 6.888 | 2.747 | 0.788 | 0.057 |
-| Baseline: previous avg finish | 4.564 | 0.875 | 0.783 | 0.085 |
-| Ridge | 11.921 | 2.317 | 0.686 | 0.102 |
+### Tier classification
 
-In this evaluation snapshot, the previous-season points-rank baseline outperforms
-the ML regressors. That is a useful result: future model changes must beat this
-reference before they can be described as adding predictive value.
+The tier classifier is also retrained before each test season. Accuracy is the
+fraction of correctly classified drivers, while macro F1 gives each tier equal
+weight. The previous ambiguous “CV Accuracy” value has been removed; these are
+walk-forward test-season metrics only.
 
-The fixed 2020–2024 holdout below is retained as the headline comparison;
-the rolling-origin results show how stable performance is across multiple
-forecast cutoffs rather than relying on one test window.
+| Model | Test seasons | Mean accuracy | Accuracy SD | Mean macro F1 | Macro F1 SD |
+|---|---:|---:|---:|---:|---:|
+| Random Forest | 10 | 0.516 | 0.094 | 0.415 | 0.096 |
 
-| Model | CV RMSE | R² | Spearman ρ |
-|---|---|---|---|
-| Ridge Regression | 17.410 | -1.789 | 0.699 |
-| Random Forest Regressor | 16.828 | 0.236 | 0.832 |
-| Gradient Boosting Regressor | 17.404 | 0.152 | 0.776 |
+| Tier | Test seasons | Mean F1 | F1 SD |
+|---|---:|---:|---:|
+| Champion | 10 | 0.700 | 0.292 |
+| Podium | 10 | 0.174 | 0.283 |
+| Top 5 | 10 | 0.117 | 0.249 |
+| Top 10 | 10 | 0.542 | 0.126 |
+| Midfield | 10 | 0.273 | 0.214 |
+| Backmarker | 10 | 0.684 | 0.138 |
 
-**Best model:** Random Forest — selected by highest Spearman ρ (0.832).
-
-**Tier Classifier (Random Forest):** Stratified Grouped CV Accuracy 0.707 | Test Accuracy 0.518 | Test Macro F1 0.461
-
-| Tier | Test F1 |
-|---|---:|
-| Champion | 0.667 |
-| Podium | 0.471 |
-| Top 5 | 0.125 |
-| Top 10 | 0.515 |
-| Midfield | 0.256 |
-| Backmarker | 0.730 |
+The complete per-season values are regenerated by `python scripts/evaluate.py`;
+the training cutoff for every row is retained in
+`results/rolling_origin_summary_details.csv` and
+`results/tier_rolling_origin_summary_details.csv`.
 
 ---
 
-## Feature Importance (Best Model)
+## Feature Importance (Predeclared Random Forest)
 
 | Rank | Feature | Importance |
 |---|---|---|

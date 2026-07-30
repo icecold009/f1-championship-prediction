@@ -57,7 +57,7 @@ def validate_release(base_dir: Path = BASE_DIR, year: int = 2023) -> list[str]:
         errors.append(f"Missing prediction artifact: results/{year}_predictions.csv")
     else:
         predictions = pd.read_csv(prediction_path, nrows=1)
-        required_prediction_columns = {"Predicted Rank", "Driver", "Predicted Score"}
+        required_prediction_columns = {"Predicted Rank", "Driver", "Predicted Position"}
         missing_prediction_columns = sorted(
             required_prediction_columns - set(predictions.columns)
         )
@@ -71,6 +71,10 @@ def validate_release(base_dir: Path = BASE_DIR, year: int = 2023) -> list[str]:
         f"predicted_vs_actual_{year}.png",
         f"f1_prediction_report_{year}.html",
         "rolling_origin_summary.csv",
+        "rolling_origin_summary_details.csv",
+        "tier_rolling_origin_summary.csv",
+        "tier_rolling_origin_summary_details.csv",
+        "tier_rolling_origin_class_summary.csv",
         "release_manifest.json",
     ):
         if not (results_dir / filename).exists():

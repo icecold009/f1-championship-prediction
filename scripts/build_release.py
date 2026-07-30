@@ -66,9 +66,9 @@ def build_release(year: int = 2023, download: bool = False) -> Path:
     prediction = predict_championship(year)
     if prediction is None:
         raise RuntimeError(f"No prediction was produced for season {year}.")
+    summary = run_evaluation(features_path=Path(PROC_DIR) / "features.csv")
     chart_path = create_visualisation(year)
     report_path = create_report(year)
-    summary = run_evaluation(features_path=Path(PROC_DIR) / "features.csv")
 
     manifest_path = RESULTS_DIR / "release_manifest.json"
     manifest = {
@@ -91,6 +91,10 @@ def build_release(year: int = 2023, download: bool = False) -> Path:
             "chart": str(chart_path.relative_to(BASE_DIR)),
             "report": str(report_path.relative_to(BASE_DIR)),
             "evaluation_summary": "results/rolling_origin_summary.csv",
+            "evaluation_details": "results/rolling_origin_summary_details.csv",
+            "tier_evaluation_summary": "results/tier_rolling_origin_summary.csv",
+            "tier_evaluation_details": "results/tier_rolling_origin_summary_details.csv",
+            "tier_class_summary": "results/tier_rolling_origin_class_summary.csv",
         },
     }
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)

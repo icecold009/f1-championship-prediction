@@ -11,7 +11,7 @@ def test_create_report_renders_prediction_summary(tmp_path, monkeypatch):
             "Driver": ["Driver One", "Driver Two"],
             "Team": ["Team A", "Team B"],
             "Predicted Tier": ["Champion", "Podium"],
-            "Predicted Score": [1.2, 2.1],
+            "Predicted Position": [1.2, 2.1],
             "Actual Position": [1, 2],
             "Actual Points": [100, 80],
         }
