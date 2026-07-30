@@ -7,7 +7,7 @@ import textwrap
 # Add src to path so we can import directly
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
-from data_processing import load_raw_data, create_features
+from data_processing import create_features, load_raw_data
 from model import train_model
 from predict import predict_championship
 from report import create_report
@@ -32,25 +32,22 @@ def main() -> int:
         ),
     )
     parser.add_argument(
-        "--year",
-        type=int,
-        default=2023,
-        help="Season year to predict (default: 2023)"
+        "--year", type=int, default=2023, help="Season year to predict (default: 2023)"
     )
     parser.add_argument(
         "--skip-processing",
         action="store_true",
-        help="Skip data processing if features.csv already exists"
+        help="Skip data processing if features.csv already exists",
     )
     parser.add_argument(
         "--skip-training",
         action="store_true",
-        help="Skip model training if models already exist"
+        help="Skip model training if models already exist",
     )
     parser.add_argument(
         "--visualise",
         action="store_true",
-        help="Generate the predicted-vs-actual chart after prediction"
+        help="Generate the predicted-vs-actual chart after prediction",
     )
     parser.add_argument(
         "--report",
@@ -88,7 +85,9 @@ def main() -> int:
         logger.error("%s", exc)
         return 1
     if prediction is None:
-        logger.error("Prediction failed for year %s; pipeline did not complete.", args.year)
+        logger.error(
+            "Prediction failed for year %s; pipeline did not complete.", args.year
+        )
         return 1
 
     if args.visualise or args.report:
@@ -96,6 +95,7 @@ def main() -> int:
         logger.info("STEP 4: Visualising %s Championship", args.year)
         logger.info("%s", "=" * 60)
         from visualise import create_visualisation
+
         create_visualisation(args.year)
 
     if args.report:
@@ -106,6 +106,7 @@ def main() -> int:
 
     logger.info("\n✅  Pipeline complete!")
     return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())

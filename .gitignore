@@ -19,6 +19,9 @@ env/
 .ipynb_checkpoints/
 *.ipynb_checkpoints
 .pytest_cache/
+.pytest-codex-*/
+.coverage
+.coverage.*
 
 # Data - downloaded inputs and regenerated processed outputs
 data/raw/

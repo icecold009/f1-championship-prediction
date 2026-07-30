@@ -1,3 +1,6 @@
+import hashlib
+import json
+
 import pandas as pd
 
 from scripts.check_release import RAW_FILES, validate_release
@@ -20,10 +23,21 @@ def test_validate_release_accepts_complete_artifact_layout(tmp_path):
         directory.mkdir(parents=True)
     for filename in RAW_FILES:
         (raw_dir / filename).touch()
+    files = {
+        filename: {
+            "sha256": hashlib.sha256(b"").hexdigest(),
+            "bytes": 0,
+        }
+        for filename in RAW_FILES
+    }
+    (raw_dir / "data_manifest.json").write_text(
+        json.dumps({"files": files}),
+        encoding="utf-8",
+    )
 
-    pd.DataFrame(
-        {"year": [2023], "driverId": [1], "champ_position": [1]}
-    ).to_csv(processed_dir / "features.csv", index=False)
+    pd.DataFrame({"year": [2023], "driverId": [1], "champ_position": [1]}).to_csv(
+        processed_dir / "features.csv", index=False
+    )
     (models_dir / "championship_model.pkl").touch()
     (models_dir / "tier_classifier.pkl").touch()
     pd.DataFrame(
@@ -51,8 +65,19 @@ def test_validate_release_accepts_complete_artifact_layout(tmp_path):
         "error_analysis_driver.csv",
         "error_analysis_season_summary.csv",
         "error_analysis_group_summary.csv",
+        "model_vs_naive_summary.csv",
+        "model_vs_naive_by_season.png",
+        "uncertainty_calibration_driver.csv",
+        "uncertainty_calibration_summary.csv",
+        "uncertainty_calibration_bins.csv",
+        "permutation_importance_details.csv",
+        "permutation_importance_summary.csv",
         "release_manifest.json",
     ):
         (results_dir / filename).touch()
 
     assert validate_release(tmp_path, year=2023) == []
+
+    (raw_dir / RAW_FILES[0]).write_text("changed", encoding="utf-8")
+    errors = validate_release(tmp_path, year=2023)
+    assert any("Raw-data checksum mismatch" in error for error in errors)
