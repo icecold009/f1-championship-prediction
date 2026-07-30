@@ -36,6 +36,7 @@ FEATURE_COLUMNS = [
 
 TIER_LABELS = ["Champion", "Podium", "Top 5", "Top 10", "Midfield", "Backmarker"]
 ROLLING_ORIGIN_TEST_SEASONS = 10
+NAIVE_BASELINE_NAME = "Naive: previous-season final order"
 
 
 def assign_tier(pos: float | int | None) -> str:
@@ -74,6 +75,17 @@ def _regression_candidates() -> dict[str, object]:
             n_estimators=200, max_depth=5, random_state=42
         ),
     }
+
+
+def previous_season_final_order(test_df: pd.DataFrame) -> pd.Series:
+    """Predict current order by ranking entrants on prior-season points.
+
+    This is a deliberately simple pre-season baseline. Drivers without a
+    prior-season record receive zero points and ties use source-row order.
+    """
+    return test_df["prev_season_points_sum"].fillna(0).rank(
+        method="first", ascending=False
+    )
 
 
 def _rolling_cutoffs(
@@ -119,15 +131,16 @@ def evaluate_rolling_origin(
         X_test = test_df[FEATURE_COLUMNS].fillna(0)
         y_test = test_df["champ_position"]
 
+        naive_predictions = previous_season_final_order(test_df)
+        naive_spearman = get_spearman(y_test, naive_predictions)
         baseline_predictions = {
+            NAIVE_BASELINE_NAME: naive_predictions,
             "Baseline: previous avg finish": test_df[
                 "prev_season_avg_finish_pos"
             ].fillna(y_train.median()),
-            "Baseline: previous points rank": test_df[
-                "prev_season_points_sum"
-            ].fillna(0).rank(method="first", ascending=False),
         }
         for name, predictions in baseline_predictions.items():
+            spearman = get_spearman(y_test, predictions)
             rows.append(
                 {
                     "test_year": test_year,
@@ -135,13 +148,15 @@ def evaluate_rolling_origin(
                     "model": name,
                     "rmse": float(np.sqrt(mean_squared_error(y_test, predictions))),
                     "r2": float(r2_score(y_test, predictions)),
-                    "spearman": get_spearman(y_test, predictions),
+                    "spearman": spearman,
+                    "spearman_delta_vs_naive": spearman - naive_spearman,
                 }
             )
 
         for name, model in _regression_candidates().items():
             model.fit(X_train, y_train)  # type: ignore[attr-defined]
             predictions = model.predict(X_test)  # type: ignore[attr-defined]
+            spearman = get_spearman(y_test, predictions)
             rows.append(
                 {
                     "test_year": test_year,
@@ -149,7 +164,8 @@ def evaluate_rolling_origin(
                     "model": name,
                     "rmse": float(np.sqrt(mean_squared_error(y_test, predictions))),
                     "r2": float(r2_score(y_test, predictions)),
-                    "spearman": get_spearman(y_test, predictions),
+                    "spearman": spearman,
+                    "spearman_delta_vs_naive": spearman - naive_spearman,
                 }
             )
 
@@ -247,10 +263,12 @@ def train_model() -> tuple[object | None, RandomForestClassifier]:
         "\n── Rolling-origin backtest (%s seasons; baselines included) ───",
         rolling_results["test_year"].nunique(),
     )
-    rolling_summary = rolling_results.groupby("model")[["rmse", "r2", "spearman"]].agg(["mean", "std"])
+    rolling_summary = rolling_results.groupby("model")[[
+        "rmse", "r2", "spearman", "spearman_delta_vs_naive"
+    ]].agg(["mean", "std"])
     for model_name, metrics in rolling_summary.iterrows():
         logger.info(
-            "  %-24s | RMSE: %.3f +/- %.3f | R²: %.3f +/- %.3f | Spearman: %.3f +/- %.3f",
+            "  %-24s | RMSE: %.3f +/- %.3f | R²: %.3f +/- %.3f | Spearman: %.3f +/- %.3f | Δ naive: %.3f +/- %.3f",
             model_name,
             metrics[("rmse", "mean")],
             metrics[("rmse", "std")],
@@ -258,6 +276,8 @@ def train_model() -> tuple[object | None, RandomForestClassifier]:
             metrics[("r2", "std")],
             metrics[("spearman", "mean")],
             metrics[("spearman", "std")],
+            metrics[("spearman_delta_vs_naive", "mean")],
+            metrics[("spearman_delta_vs_naive", "std")],
         )
 
     tier_results = evaluate_tier_rolling_origin(df)

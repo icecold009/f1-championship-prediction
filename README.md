@@ -129,15 +129,21 @@ The reported values are the mean and standard deviation across ten chronological
 test seasons, 2015–2024. RMSE measures position error, R² measures explained
 position variance, and Spearman ρ measures agreement in predicted order.
 
-| Model / baseline | Test seasons | Mean RMSE | RMSE SD | Mean R² | R² SD | Mean Spearman ρ | Spearman SD |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Baseline: previous points rank | 10 | 3.758 | 0.747 | 0.641 | 0.161 | 0.821 | 0.081 |
-| Random Forest | 10 | 6.657 | 2.818 | -0.277 | 1.042 | 0.808 | 0.061 |
-| Gradient Boosting | 10 | 6.888 | 2.747 | -0.350 | 1.060 | 0.788 | 0.057 |
-| Baseline: previous avg finish | 10 | 4.564 | 0.875 | 0.462 | 0.273 | 0.783 | 0.085 |
-| Ridge | 10 | 11.921 | 2.317 | -2.648 | 1.729 | 0.686 | 0.102 |
+The primary naïve baseline is **previous-season final order**: rank the current
+season's entrants by their prior-season championship points, assigning drivers
+without prior history zero points. It uses no fitted model and represents the
+simple pre-season guess that last season's order will persist. The delta column
+is each row's Spearman ρ minus that naïve baseline on the same test season.
 
-The previous-season points-rank baseline remains stronger than every machine
+| Model / baseline | Test seasons | Mean RMSE | RMSE SD | Mean R² | R² SD | Mean Spearman ρ | Spearman SD | Mean Δ vs naïve | Δ SD |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Naive: previous-season final order | 10 | 3.758 | 0.747 | 0.641 | 0.161 | 0.821 | 0.081 | 0.000 | 0.000 |
+| Random Forest | 10 | 6.657 | 2.818 | -0.277 | 1.042 | 0.808 | 0.061 | -0.012 | 0.065 |
+| Gradient Boosting | 10 | 6.888 | 2.747 | -0.350 | 1.060 | 0.788 | 0.057 | -0.033 | 0.068 |
+| Baseline: previous avg finish | 10 | 4.564 | 0.875 | 0.462 | 0.273 | 0.783 | 0.085 | -0.038 | 0.031 |
+| Ridge | 10 | 11.921 | 2.317 | -2.648 | 1.729 | 0.686 | 0.102 | -0.134 | 0.125 |
+
+The naïve previous-season-order baseline remains stronger than every machine
 learning regressor in this walk-forward evaluation. Random Forest is retained as
 the predeclared operational model for the generated forecast artifact; it is not
 described as the best model based on these reported test seasons.

@@ -9,7 +9,7 @@ betting recommendation.
 
 The current saved regression model is a predeclared Random Forest used for the
 user-facing forecast artifact. In the leak-free rolling-origin evaluation, the
-previous-season points-rank baseline currently outperforms the machine-learning
+naive previous-season final-order baseline currently outperforms the machine-learning
 models, so the Random Forest should not be described as superior to that
 baseline.
 
@@ -58,26 +58,30 @@ list.
    aggregating their means and standard deviations.
 4. Tier classification reports per-season accuracy, macro F1, and per-class F1
    because the classes are imbalanced.
-5. The previous-season points-rank and previous-season average-finish methods
-   are included as transparent baselines.
+5. The naive previous-season final-order and previous-season average-finish
+   methods are included as transparent baselines.
 
 ## Reported results
 
 Walk-forward means across 2015–2024:
 
-| Model / baseline | Test seasons | Mean RMSE | RMSE SD | Mean R² | R² SD | Mean Spearman | Spearman SD |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Baseline: previous points rank | 10 | 3.758 | 0.747 | 0.641 | 0.161 | 0.821 | 0.081 |
-| Random Forest | 10 | 6.657 | 2.818 | -0.277 | 1.042 | 0.808 | 0.061 |
-| Gradient Boosting | 10 | 6.888 | 2.747 | -0.350 | 1.060 | 0.788 | 0.057 |
-| Baseline: previous avg finish | 10 | 4.564 | 0.875 | 0.462 | 0.273 | 0.783 | 0.085 |
-| Ridge | 10 | 11.921 | 2.317 | -2.648 | 1.729 | 0.686 | 0.102 |
+| Model / baseline | Test seasons | Mean RMSE | RMSE SD | Mean R² | R² SD | Mean Spearman | Spearman SD | Mean Δ vs naive | Δ SD |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| Naive: previous-season final order | 10 | 3.758 | 0.747 | 0.641 | 0.161 | 0.821 | 0.081 | 0.000 | 0.000 |
+| Random Forest | 10 | 6.657 | 2.818 | -0.277 | 1.042 | 0.808 | 0.061 | -0.012 | 0.065 |
+| Gradient Boosting | 10 | 6.888 | 2.747 | -0.350 | 1.060 | 0.788 | 0.057 | -0.033 | 0.068 |
+| Baseline: previous avg finish | 10 | 4.564 | 0.875 | 0.462 | 0.273 | 0.783 | 0.085 | -0.038 | 0.031 |
+| Ridge | 10 | 11.921 | 2.317 | -2.648 | 1.729 | 0.686 | 0.102 | -0.134 | 0.125 |
 
 These values are regenerated with:
 
 ```bash
 python scripts/evaluate.py
 ```
+
+The naive baseline ranks each test-season entrant by prior-season championship
+points, assigning zero to drivers without prior history. The delta columns are
+computed against that same-season baseline before aggregation.
 
 Tier classification walk-forward metrics:
 

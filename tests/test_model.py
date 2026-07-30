@@ -5,10 +5,12 @@ import pytest
 from src import predict
 from src.model import (
     FEATURE_COLUMNS,
+    NAIVE_BASELINE_NAME,
     assign_tier,
     evaluate_rolling_origin,
     evaluate_tier_rolling_origin,
     get_spearman,
+    previous_season_final_order,
 )
 
 
@@ -37,6 +39,12 @@ def test_get_spearman_perfect_and_inverse_rankings():
     assert get_spearman([1, 2, 3], [30, 20, 10]) == pytest.approx(-1.0)
 
 
+def test_previous_season_final_order_is_an_explicit_naive_baseline():
+    test_df = pd.DataFrame({"prev_season_points_sum": [100.0, 50.0, np.nan]})
+
+    assert previous_season_final_order(test_df).tolist() == [1.0, 2.0, 3.0]
+
+
 def test_rolling_origin_keeps_test_seasons_after_training_cutoff():
     rows = []
     for year in range(2010, 2016):
@@ -60,7 +68,7 @@ def test_rolling_origin_keeps_test_seasons_after_training_cutoff():
         "Random Forest",
         "Gradient Boosting",
         "Baseline: previous avg finish",
-        "Baseline: previous points rank",
+        NAIVE_BASELINE_NAME,
     }
 
 

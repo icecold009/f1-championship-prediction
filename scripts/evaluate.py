@@ -30,6 +30,8 @@ def summarize_results(results: pd.DataFrame) -> pd.DataFrame:
             r2_sd=("r2", "std"),
             mean_spearman=("spearman", "mean"),
             spearman_sd=("spearman", "std"),
+            mean_spearman_delta_vs_naive=("spearman_delta_vs_naive", "mean"),
+            spearman_delta_vs_naive_sd=("spearman_delta_vs_naive", "std"),
         )
         .reset_index()
         .sort_values("mean_spearman", ascending=False)
