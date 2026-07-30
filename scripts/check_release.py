@@ -86,6 +86,9 @@ def validate_release(base_dir: Path = BASE_DIR, year: int = 2023) -> list[str]:
         "tier_rolling_origin_summary.csv",
         "tier_rolling_origin_summary_details.csv",
         "tier_rolling_origin_class_summary.csv",
+        "error_analysis_driver.csv",
+        "error_analysis_season_summary.csv",
+        "error_analysis_group_summary.csv",
         "release_manifest.json",
     ):
         if not (results_dir / filename).exists():

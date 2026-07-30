@@ -36,6 +36,7 @@ Before sharing a report:
 - Confirm the rolling baseline comparison is included.
 - Confirm the tier accuracy, macro F1, and per-tier F1 tables are included.
 - Confirm the bootstrap uncertainty table and run count are included.
+- Confirm the “Where this model breaks” error-analysis tables are included.
 - State that the report is historical analysis, not a live or betting system.
 
 ## Monitoring boundary

@@ -16,6 +16,7 @@ sys.path.insert(0, str(BASE_DIR / "scripts"))
 
 from check_release import validate_release
 from data_processing import PROC_DIR, create_features, load_raw_data
+from error_analysis import run_error_analysis
 from evaluate import run_evaluation
 from model import train_model
 from predict import predict_championship
@@ -67,6 +68,10 @@ def build_release(year: int = 2023, download: bool = False) -> Path:
     if prediction is None:
         raise RuntimeError(f"No prediction was produced for season {year}.")
     summary = run_evaluation(features_path=Path(PROC_DIR) / "features.csv")
+    run_error_analysis(
+        features_path=Path(PROC_DIR) / "features.csv",
+        output_dir=RESULTS_DIR,
+    )
     chart_path = create_visualisation(year)
     report_path = create_report(year)
 
@@ -95,6 +100,9 @@ def build_release(year: int = 2023, download: bool = False) -> Path:
             "tier_evaluation_summary": "results/tier_rolling_origin_summary.csv",
             "tier_evaluation_details": "results/tier_rolling_origin_summary_details.csv",
             "tier_class_summary": "results/tier_rolling_origin_class_summary.csv",
+            "error_analysis_driver": "results/error_analysis_driver.csv",
+            "error_analysis_season": "results/error_analysis_season_summary.csv",
+            "error_analysis_group": "results/error_analysis_group_summary.csv",
         },
     }
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)

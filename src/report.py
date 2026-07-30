@@ -79,6 +79,33 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
             "to include tier classification benchmark results.</p>"
         )
 
+    error_season_path = RESULTS_DIR / "error_analysis_season_summary.csv"
+    error_group_path = RESULTS_DIR / "error_analysis_group_summary.csv"
+    if error_season_path.exists() and error_group_path.exists():
+        error_seasons = pd.read_csv(error_season_path).sort_values(
+            "mae", ascending=False
+        )
+        error_groups = pd.read_csv(error_group_path).sort_values(
+            "mae", ascending=False
+        )
+        error_season_markup = error_seasons.head(5).to_html(
+            index=False, classes="data-table", border=0, justify="left"
+        )
+        error_group_markup = error_groups.to_html(
+            index=False, classes="data-table", border=0, justify="left"
+        )
+        error_markup = (
+            "<h3>Worst test seasons by MAE</h3>"
+            + error_season_markup
+            + "<h3>Error by driver/season type</h3>"
+            + error_group_markup
+        )
+    else:
+        error_markup = (
+            '<p class="muted">Run <code>python scripts/error_analysis.py</code> '
+            "to include error analysis.</p>"
+        )
+
     top_driver = str(predictions.iloc[0]["Driver"])
     top_team = str(predictions.iloc[0]["Team"])
     uncertainty_columns = [
@@ -194,6 +221,11 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
       <h2>Tier classification</h2>
       <p>Random Forest tier metrics averaged across the same chronological test seasons. Accuracy is the fraction of correctly classified drivers; macro F1 gives each tier equal weight.</p>
       {tier_markup}
+    </section>
+    <section class="panel">
+      <h2>Where this model breaks</h2>
+      <p>Error analysis uses the same walk-forward Random Forest predictions. Rookie/gap-returning labels and mid-season swaps are post-hoc diagnostic categories, not model inputs; 2022 is isolated as a predeclared regulation-change case study.</p>
+      {error_markup}
     </section>
     <section class="panel">
       <h2>Bootstrap uncertainty</h2>

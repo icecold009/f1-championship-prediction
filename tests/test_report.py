@@ -24,6 +24,12 @@ def test_create_report_renders_prediction_summary(tmp_path, monkeypatch):
             "Top 5 Probability": [1.0, 0.9],
         }
     ).to_csv(tmp_path / "2023_predictions.csv", index=False)
+    pd.DataFrame(
+        {"test_year": [2022], "mae": [4.1], "rmse": [5.2]}
+    ).to_csv(tmp_path / "error_analysis_season_summary.csv", index=False)
+    pd.DataFrame(
+        {"dimension": ["Driver type"], "group": ["Rookie"], "mae": [8.2]}
+    ).to_csv(tmp_path / "error_analysis_group_summary.csv", index=False)
 
     output_path = report.create_report(2023)
 
@@ -34,3 +40,5 @@ def test_create_report_renders_prediction_summary(tmp_path, monkeypatch):
     assert "Run with <code>--visualise</code>" in contents
     assert "Bootstrap uncertainty" in contents
     assert "50%" in contents
+    assert "Where this model breaks" in contents
+    assert "Worst test seasons" in contents

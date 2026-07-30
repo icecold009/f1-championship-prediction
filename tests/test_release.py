@@ -48,6 +48,9 @@ def test_validate_release_accepts_complete_artifact_layout(tmp_path):
         "tier_rolling_origin_summary.csv",
         "tier_rolling_origin_summary_details.csv",
         "tier_rolling_origin_class_summary.csv",
+        "error_analysis_driver.csv",
+        "error_analysis_season_summary.csv",
+        "error_analysis_group_summary.csv",
         "release_manifest.json",
     ):
         (results_dir / filename).touch()

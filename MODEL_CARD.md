@@ -112,6 +112,22 @@ not calibrated probabilities, prediction intervals with guaranteed coverage, or
 betting odds; the model does not claim that a 62% bootstrap frequency equals a
 62% real-world chance.
 
+## Where this model breaks
+
+The walk-forward Random Forest errors are also segmented post-hoc by driver and
+season context. Returning drivers with no immediately prior history have the
+largest average error (MAE 14.396 across 11 observations), followed by rookies
+(MAE 8.241 across 33 observations). Established returning drivers are materially
+more predictable (MAE 3.216 across 179 observations). Mid-season constructor
+swaps have MAE 4.823 across only seven observations, so that comparison is
+directional rather than conclusive.
+
+The 2022 regulation-change case study has RMSE 5.277, MAE 4.123, and Spearman
+0.848. It is not the worst test season in this sample; 2015 has the largest MAE
+at 7.503. This prevents the analysis from turning a plausible regulation-change
+story into an unsupported claim. See the generated error-analysis CSVs for the
+complete per-driver and per-season evidence.
+
 ## Limitations and risks
 
 - The dataset is a historical snapshot and may contain source corrections,
