@@ -223,7 +223,10 @@ def evaluate_permutation_importance(
             scoring="neg_root_mean_squared_error",
             n_repeats=repeats,
             random_state=42 + test_year,
-            n_jobs=-1,
+            # The forest already parallelizes tree predictions. Keeping the
+            # outer permutation loop serial avoids nested joblib workers and
+            # repeated scikit-learn configuration warnings.
+            n_jobs=1,
         )
         baseline_rmse = (
             mean_squared_error(
