@@ -15,7 +15,7 @@ def _card(label: str, value: str, detail: str = "") -> str:
     return (
         '<div class="card">'
         f'<span class="card-label">{html.escape(label)}</span>'
-        f'<strong>{html.escape(value)}</strong>'
+        f"<strong>{html.escape(value)}</strong>"
         f'<span class="card-detail">{html.escape(detail)}</span>'
         "</div>"
     )
@@ -60,18 +60,33 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
             "to include rolling-origin benchmark results.</p>"
         )
 
+    paired_summary_path = RESULTS_DIR / "model_vs_naive_summary.csv"
+    paired_chart_path = RESULTS_DIR / "model_vs_naive_by_season.png"
+    if paired_summary_path.exists():
+        paired_summary_markup = pd.read_csv(paired_summary_path).to_html(
+            index=False, classes="data-table", border=0, justify="left"
+        )
+    else:
+        paired_summary_markup = (
+            '<p class="muted">Re-run the evaluation to include paired '
+            "confidence intervals and season win/loss counts.</p>"
+        )
+    paired_chart_markup = (
+        '<img src="model_vs_naive_by_season.png" '
+        'alt="Per-season Spearman difference versus naïve baseline">'
+        if paired_chart_path.exists()
+        else ""
+    )
+
     tier_summary_path = RESULTS_DIR / "tier_rolling_origin_summary.csv"
     tier_class_summary_path = RESULTS_DIR / "tier_rolling_origin_class_summary.csv"
     if tier_summary_path.exists() and tier_class_summary_path.exists():
         tier_summary = pd.read_csv(tier_summary_path)
         tier_class_summary = pd.read_csv(tier_class_summary_path)
-        tier_markup = (
-            tier_summary.to_html(
-                index=False, classes="data-table", border=0, justify="left"
-            )
-            + tier_class_summary.to_html(
-                index=False, classes="data-table", border=0, justify="left"
-            )
+        tier_markup = tier_summary.to_html(
+            index=False, classes="data-table", border=0, justify="left"
+        ) + tier_class_summary.to_html(
+            index=False, classes="data-table", border=0, justify="left"
         )
     else:
         tier_markup = (
@@ -85,9 +100,7 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
         error_seasons = pd.read_csv(error_season_path).sort_values(
             "mae", ascending=False
         )
-        error_groups = pd.read_csv(error_group_path).sort_values(
-            "mae", ascending=False
-        )
+        error_groups = pd.read_csv(error_group_path).sort_values("mae", ascending=False)
         error_season_markup = error_seasons.head(5).to_html(
             index=False, classes="data-table", border=0, justify="left"
         )
@@ -104,6 +117,37 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
         error_markup = (
             '<p class="muted">Run <code>python scripts/error_analysis.py</code> '
             "to include error analysis.</p>"
+        )
+
+    calibration_summary_path = RESULTS_DIR / "uncertainty_calibration_summary.csv"
+    calibration_bins_path = RESULTS_DIR / "uncertainty_calibration_bins.csv"
+    if calibration_summary_path.exists() and calibration_bins_path.exists():
+        calibration_markup = (
+            pd.read_csv(calibration_summary_path).to_html(
+                index=False, classes="data-table", border=0, justify="left"
+            )
+            + "<h3>Top-three probability calibration</h3>"
+            + pd.read_csv(calibration_bins_path).to_html(
+                index=False, classes="data-table", border=0, justify="left"
+            )
+        )
+    else:
+        calibration_markup = (
+            '<p class="muted">Run <code>python scripts/model_audit.py</code> '
+            "to include uncertainty calibration.</p>"
+        )
+
+    importance_path = RESULTS_DIR / "permutation_importance_summary.csv"
+    if importance_path.exists():
+        importance_markup = (
+            pd.read_csv(importance_path)
+            .head(10)
+            .to_html(index=False, classes="data-table", border=0, justify="left")
+        )
+    else:
+        importance_markup = (
+            '<p class="muted">Run <code>python scripts/model_audit.py</code> '
+            "to include held-out permutation importance.</p>"
         )
 
     top_driver = str(predictions.iloc[0]["Driver"])
@@ -133,8 +177,9 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
             index=False, classes="data-table", border=0, justify="left"
         )
         top_driver_detail = (
-            f"{float(predictions.iloc[0]['Champion Probability']):.0%} title chance; "
-            f"{float(predictions.iloc[0]['Top 3 Probability']):.0%} top-3 chance"
+            f"{float(predictions.iloc[0]['Champion Probability']):.0%} champion "
+            "bootstrap frequency; "
+            f"{float(predictions.iloc[0]['Top 3 Probability']):.0%} top-3 frequency"
         )
     else:
         uncertainty_markup = (
@@ -149,7 +194,9 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
     cards = "".join(
         [
             _card("Point forecast champion", top_driver, top_driver_detail),
-            _card("Predicted position", f"{predictions.iloc[0]['Predicted Position']:.2f}"),
+            _card(
+                "Predicted position", f"{predictions.iloc[0]['Predicted Position']:.2f}"
+            ),
             _card("Drivers ranked", str(len(predictions))),
             _card("Spearman vs actual", correlation_text),
         ]
@@ -216,6 +263,10 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
       <h2>Rolling-origin evaluation</h2>
       <p>Historical benchmark across chronological test seasons. Each test season is held out in full; lower RMSE is better, while higher R² and Spearman are better.</p>
       {evaluation_markup}
+      <h3>Paired comparison with the naïve baseline</h3>
+      <p>Confidence intervals resample whole test seasons. Win/loss counts compare each method with the baseline on exactly the same seasons.</p>
+      {paired_chart_markup}
+      {paired_summary_markup}
     </section>
     <section class="panel">
       <h2>Tier classification</h2>
@@ -229,8 +280,18 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
     </section>
     <section class="panel">
       <h2>Bootstrap uncertainty</h2>
-      <p>Each row reports the distribution from 100 season-level bootstrap Random Forest fits. Probabilities are the fraction of bootstrap rankings placing a driver champion, in the top 3, or in the top 5; P05–P95 is the central 90% position interval.</p>
+      <p>Each row reports the distribution from 100 season-level bootstrap Random Forest fits. Frequencies are the fraction of bootstrap rankings placing a driver champion, in the top 3, or in the top 5. P05–P95 describes model sensitivity, not a calibrated 90% prediction interval; historical coverage is reported below.</p>
       {uncertainty_markup}
+    </section>
+    <section class="panel">
+      <h2>Uncertainty calibration</h2>
+      <p>Historical coverage is measured only on untouched future seasons. Rolling conformal intervals use residuals available before each test season; Brier scores assess probability quality.</p>
+      {calibration_markup}
+    </section>
+    <section class="panel">
+      <h2>Held-out permutation importance</h2>
+      <p>Importance is the increase in RMSE after permuting one feature in each held-out season. This replaces training-set impurity importance with an out-of-season measurement.</p>
+      {importance_markup}
     </section>
     <section class="panel">
       <h2>Predicted order</h2>

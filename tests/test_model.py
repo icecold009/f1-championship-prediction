@@ -7,11 +7,11 @@ from src.model import (
     FEATURE_COLUMNS,
     NAIVE_BASELINE_NAME,
     assign_tier,
+    bootstrap_position_predictions,
     evaluate_rolling_origin,
     evaluate_tier_rolling_origin,
     get_spearman,
     previous_season_final_order,
-    bootstrap_position_predictions,
 )
 
 
@@ -81,7 +81,9 @@ def test_rolling_origin_keeps_test_seasons_after_training_cutoff():
                 "driverId": driver_id,
                 "champ_position": position,
             }
-            row.update({column: float(driver_id) + year / 1000 for column in FEATURE_COLUMNS})
+            row.update(
+                {column: float(driver_id) + year / 1000 for column in FEATURE_COLUMNS}
+            )
             rows.append(row)
 
     results = evaluate_rolling_origin(
@@ -92,7 +94,8 @@ def test_rolling_origin_keeps_test_seasons_after_training_cutoff():
     assert (results["train_end_year"] < results["test_year"]).all()
     assert set(results["model"]) == {
         "Ridge",
-        "Random Forest",
+        "Random Forest (history only)",
+        "Random Forest + cold-start flags",
         "Gradient Boosting",
         "Baseline: previous avg finish",
         NAIVE_BASELINE_NAME,

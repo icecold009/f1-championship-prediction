@@ -46,5 +46,7 @@ def test_error_analysis_labels_driver_types_and_constructor_swaps():
     assert rookie.iloc[0]["driver_type"] == "Rookie"
     assert bool(swap.iloc[0]["mid_season_swap"])
 
-    errors = generate_error_rows(annotated, test_seasons=2, min_train_seasons=3, n_estimators=3)
+    errors = generate_error_rows(
+        annotated, test_seasons=2, min_train_seasons=3, n_estimators=3
+    )
     assert (errors["train_end_year"] < errors["test_year"]).all()

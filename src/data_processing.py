@@ -64,8 +64,7 @@ def create_features(
 
     # Join race metadata and stable driver/constructor identifiers.
     df = (
-        results
-        .merge(races[["raceId", "year", "round"]], on="raceId", how="left")
+        results.merge(races[["raceId", "year", "round"]], on="raceId", how="left")
         .merge(drivers[["driverId", "driverRef"]], on="driverId", how="left")
         .merge(
             constructors[["constructorId", "constructorRef"]],
@@ -84,22 +83,30 @@ def create_features(
 
     # Build historical driver-season statistics. These are shifted forward by
     # one year below, so no same-season race outcome becomes a predictor.
-    driver_stats = df.groupby(["year", "driverId", "driverRef"]).agg(
-        races_started=("raceId", "count"),
-        avg_finish_pos=("positionOrder", "mean"),
-        std_finish_pos=("positionOrder", "std"),
-        points_sum=("points", "sum"),
-        avg_grid_pos=("grid", "mean"),
-        wins=("positionOrder", lambda values: (values == 1).sum()),
-        podiums=("positionOrder", lambda values: (values <= 3).sum()),
-        points_finishes=("positionOrder", lambda values: (values <= 10).sum()),
-        dnf_count=("dnf", "sum"),
-    ).reset_index()
+    driver_stats = (
+        df.groupby(["year", "driverId", "driverRef"])
+        .agg(
+            races_started=("raceId", "count"),
+            avg_finish_pos=("positionOrder", "mean"),
+            std_finish_pos=("positionOrder", "std"),
+            points_sum=("points", "sum"),
+            avg_grid_pos=("grid", "mean"),
+            wins=("positionOrder", lambda values: (values == 1).sum()),
+            podiums=("positionOrder", lambda values: (values <= 3).sum()),
+            points_finishes=("positionOrder", lambda values: (values <= 10).sum()),
+            dnf_count=("dnf", "sum"),
+        )
+        .reset_index()
+    )
 
     driver_stats["win_rate"] = driver_stats["wins"] / driver_stats["races_started"]
-    driver_stats["podium_rate"] = driver_stats["podiums"] / driver_stats["races_started"]
+    driver_stats["podium_rate"] = (
+        driver_stats["podiums"] / driver_stats["races_started"]
+    )
     driver_stats["dnf_rate"] = driver_stats["dnf_count"] / driver_stats["races_started"]
-    driver_stats["points_per_race"] = driver_stats["points_sum"] / driver_stats["races_started"]
+    driver_stats["points_per_race"] = (
+        driver_stats["points_sum"] / driver_stats["races_started"]
+    )
     driver_stats["quali_to_race_delta"] = (
         driver_stats["avg_grid_pos"] - driver_stats["avg_finish_pos"]
     )
@@ -109,8 +116,7 @@ def create_features(
         sprint_results["points"], errors="coerce"
     ).fillna(0)
     sprint_agg = (
-        sprint_results
-        .merge(races[["raceId", "year"]], on="raceId", how="left")
+        sprint_results.merge(races[["raceId", "year"]], on="raceId", how="left")
         .groupby(["year", "driverId"])["sprintPoints"]
         .sum()
         .reset_index()
@@ -137,11 +143,9 @@ def create_features(
 
     # The first observed constructor is the season-opening team available at
     # forecast time; later same-season team changes must not affect features.
-    season_entries = (
-        df.sort_values(["year", "round", "raceId"])
-        .drop_duplicates(["year", "driverId"])
-        [["year", "driverId", "constructorId", "driverRef", "constructorRef"]]
-    )
+    season_entries = df.sort_values(["year", "round", "raceId"]).drop_duplicates(
+        ["year", "driverId"]
+    )[["year", "driverId", "constructorId", "driverRef", "constructorRef"]]
 
     history_columns = [
         "races_started",
@@ -163,6 +167,17 @@ def create_features(
     )
     features = season_entries.merge(prior_driver, on=["year", "driverId"], how="left")
 
+    # Cold-start context is known before a season begins. Keeping explicit
+    # indicators prevents "no prior history" from being represented only by
+    # zero-imputed performance values.
+    first_entry_year = features.groupby("driverId")["year"].transform("min")
+    missing_driver_history = features["prev_season_races_started"].isna()
+    features["is_rookie"] = features["year"].eq(first_entry_year).astype(int)
+    features["returning_after_gap"] = (
+        missing_driver_history & features["is_rookie"].eq(0)
+    ).astype(int)
+    features["missing_driver_history"] = missing_driver_history.astype(int)
+
     prior_constructor = constructor_final.copy()
     prior_constructor["year"] += 1
     prior_constructor = prior_constructor.rename(
@@ -182,6 +197,9 @@ def create_features(
         ],
         on=["year", "constructorId"],
         how="left",
+    )
+    features["missing_constructor_history"] = (
+        features["prev_team_final_position"].isna().astype(int)
     )
 
     # Targets are the final driver standings for the current season.

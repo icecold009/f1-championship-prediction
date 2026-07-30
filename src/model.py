@@ -1,24 +1,28 @@
 import logging
 import os
 import pickle
-from typing import Iterable
+from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, GradientBoostingRegressor
+from sklearn.ensemble import (
+    GradientBoostingRegressor,
+    RandomForestClassifier,
+    RandomForestRegressor,
+)
 from sklearn.linear_model import Ridge
 from sklearn.metrics import accuracy_score, f1_score, mean_squared_error, r2_score
 
 logger = logging.getLogger(__name__)
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
-BASE_DIR  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PROC_DIR  = os.path.join(BASE_DIR, "data", "processed")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROC_DIR = os.path.join(BASE_DIR, "data", "processed")
 MODEL_DIR = os.path.join(BASE_DIR, "models")
 os.makedirs(MODEL_DIR, exist_ok=True)
 
-FEATURE_COLUMNS = [
+HISTORY_FEATURE_COLUMNS = [
     "prev_season_races_started",
     "prev_season_avg_finish_pos",
     "prev_season_std_finish_pos",
@@ -33,6 +37,13 @@ FEATURE_COLUMNS = [
     "prev_team_final_points",
     "prev_team_final_position",
 ]
+COLD_START_FEATURE_COLUMNS = [
+    "is_rookie",
+    "returning_after_gap",
+    "missing_driver_history",
+    "missing_constructor_history",
+]
+FEATURE_COLUMNS = [*HISTORY_FEATURE_COLUMNS, *COLD_START_FEATURE_COLUMNS]
 
 TIER_LABELS = ["Champion", "Podium", "Top 5", "Top 10", "Midfield", "Backmarker"]
 ROLLING_ORIGIN_TEST_SEASONS = 10
@@ -58,21 +69,28 @@ def assign_tier(pos: float | int | None) -> str:
     else:
         return "Backmarker"
 
+
 def get_spearman(y_true: Iterable[float], y_pred: Iterable[float]) -> float:
     """Return the Spearman rank correlation for true and predicted values."""
     corr_val, _ = spearmanr(y_true, y_pred)
     return float(corr_val)  # type: ignore
 
 
-def _regression_candidates() -> dict[str, object]:
-    """Create fresh regression estimators for one evaluation run."""
+def _regression_candidates() -> dict[str, tuple[object, list[str]]]:
+    """Create fresh estimators and their predeclared feature sets."""
     return {
-        "Ridge": Ridge(alpha=1.0),
-        "Random Forest": RandomForestRegressor(
-            n_estimators=200, max_depth=10, random_state=42
+        "Ridge": (Ridge(alpha=1.0), FEATURE_COLUMNS),
+        "Random Forest (history only)": (
+            RandomForestRegressor(n_estimators=200, max_depth=10, random_state=42),
+            HISTORY_FEATURE_COLUMNS,
         ),
-        "Gradient Boosting": GradientBoostingRegressor(
-            n_estimators=200, max_depth=5, random_state=42
+        "Random Forest + cold-start flags": (
+            RandomForestRegressor(n_estimators=200, max_depth=10, random_state=42),
+            FEATURE_COLUMNS,
+        ),
+        "Gradient Boosting": (
+            GradientBoostingRegressor(n_estimators=200, max_depth=5, random_state=42),
+            FEATURE_COLUMNS,
         ),
     }
 
@@ -83,8 +101,10 @@ def previous_season_final_order(test_df: pd.DataFrame) -> pd.Series:
     This is a deliberately simple pre-season baseline. Drivers without a
     prior-season record receive zero points and ties use source-row order.
     """
-    return test_df["prev_season_points_sum"].fillna(0).rank(
-        method="first", ascending=False
+    return (
+        test_df["prev_season_points_sum"]
+        .fillna(0)
+        .rank(method="first", ascending=False)
     )
 
 
@@ -121,8 +141,7 @@ def bootstrap_position_predictions(
     bootstrap_predictions = np.empty((n_bootstrap, len(test_df)), dtype=float)
 
     season_rows = {
-        season: train_df[train_df["year"] == season]
-        for season in train_seasons
+        season: train_df[train_df["year"] == season] for season in train_seasons
     }
     for run in range(n_bootstrap):
         sampled_seasons = rng.choice(
@@ -138,7 +157,9 @@ def bootstrap_position_predictions(
             random_state=random_state + run,
             n_jobs=-1,
         )
-        model.fit(sampled_train[FEATURE_COLUMNS].fillna(0), sampled_train["champ_position"])
+        model.fit(
+            sampled_train[FEATURE_COLUMNS].fillna(0), sampled_train["champ_position"]
+        )
         bootstrap_predictions[run] = model.predict(X_test)
 
     bootstrap_ranks = pd.DataFrame(bootstrap_predictions).rank(
@@ -197,9 +218,7 @@ def evaluate_rolling_origin(
     for test_year, train_df, test_df, train_years in _rolling_cutoffs(
         df, test_seasons, min_train_seasons
     ):
-        X_train = train_df[FEATURE_COLUMNS].fillna(0)
         y_train = train_df["champ_position"]
-        X_test = test_df[FEATURE_COLUMNS].fillna(0)
         y_test = test_df["champ_position"]
 
         naive_predictions = previous_season_final_order(test_df)
@@ -224,7 +243,9 @@ def evaluate_rolling_origin(
                 }
             )
 
-        for name, model in _regression_candidates().items():
+        for name, (model, feature_columns) in _regression_candidates().items():
+            X_train = train_df[feature_columns].fillna(0)
+            X_test = test_df[feature_columns].fillna(0)
             model.fit(X_train, y_train)  # type: ignore[attr-defined]
             predictions = model.predict(X_test)  # type: ignore[attr-defined]
             spearman = get_spearman(y_test, predictions)
@@ -293,7 +314,7 @@ def evaluate_tier_rolling_origin(
         row.update(
             {
                 f"f1_{tier.lower().replace(' ', '_')}": float(score)
-                for tier, score in zip(TIER_LABELS, class_f1)
+                for tier, score in zip(TIER_LABELS, class_f1, strict=False)
             }
         )
         rows.append(row)
@@ -309,7 +330,13 @@ def train_model(
     features_path = os.path.join(PROC_DIR, "features.csv")
     df = pd.read_csv(features_path)
     df = df.dropna(subset=["champ_position"])
-    logger.info("Loaded %s rows across %s seasons (%s–%s)", len(df), df["year"].nunique(), df["year"].min(), df["year"].max())
+    logger.info(
+        "Loaded %s rows across %s seasons (%s–%s)",
+        len(df),
+        df["year"].nunique(),
+        df["year"].min(),
+        df["year"].max(),
+    )
 
     if forecast_year is None:
         test_years = sorted(df["year"].unique())[-5:]
@@ -344,9 +371,9 @@ def train_model(
         "\n── Rolling-origin backtest (%s seasons; baselines included) ───",
         rolling_results["test_year"].nunique(),
     )
-    rolling_summary = rolling_results.groupby("model")[[
-        "rmse", "r2", "spearman", "spearman_delta_vs_naive"
-    ]].agg(["mean", "std"])
+    rolling_summary = rolling_results.groupby("model")[
+        ["rmse", "r2", "spearman", "spearman_delta_vs_naive"]
+    ].agg(["mean", "std"])
     for model_name, metrics in rolling_summary.iterrows():
         logger.info(
             "  %-24s | RMSE: %.3f +/- %.3f | R²: %.3f +/- %.3f | Spearman: %.3f +/- %.3f | Δ naive: %.3f +/- %.3f",
@@ -374,13 +401,16 @@ def train_model(
 
     # ── Predeclared regression model for the user-facing forecast ─────────
     candidates = _regression_candidates()
-    best_name = "Random Forest"
-    best_model = candidates[best_name]
+    best_name = "Random Forest + cold-start flags"
+    best_model, operational_features = candidates[best_name]
+    X_train = train_df[operational_features].fillna(0)
     best_model.fit(X_train, y_train)  # type: ignore[attr-defined]
     logger.info("\n  Operational forecast model: %s (predeclared)", best_name)
 
     if best_model is not None and hasattr(best_model, "feature_importances_"):
-        imp = pd.Series(best_model.feature_importances_, index=FEATURE_COLUMNS).sort_values(ascending=False)
+        imp = pd.Series(
+            best_model.feature_importances_, index=FEATURE_COLUMNS
+        ).sort_values(ascending=False)
         logger.info("\n  Top 10 features:\n%s", imp.head(10).to_string())
 
     # ── Tier classifier for the user-facing forecast ───────────────────────
@@ -399,6 +429,7 @@ def train_model(
     logger.info("\n  Saved regression model → %s", reg_path)
     logger.info("  Saved tier classifier  → %s", clf_path)
     return best_model, clf
+
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")

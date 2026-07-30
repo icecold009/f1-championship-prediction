@@ -5,13 +5,20 @@ import logging
 import sys
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BASE_DIR / "src"))
 
 from data_processing import create_features, load_raw_data
-from model import TIER_LABELS, evaluate_rolling_origin, evaluate_tier_rolling_origin
+from model import (
+    NAIVE_BASELINE_NAME,
+    TIER_LABELS,
+    evaluate_rolling_origin,
+    evaluate_tier_rolling_origin,
+)
 
 logger = logging.getLogger(__name__)
 DEFAULT_FEATURES_PATH = BASE_DIR / "data" / "processed" / "features.csv"
@@ -71,6 +78,92 @@ def summarize_tier_classes(details: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows).round(3)
 
 
+def _paired_mean_interval(
+    values: np.ndarray,
+    confidence: float = 0.95,
+    bootstrap_runs: int = 10_000,
+    random_state: int = 42,
+) -> tuple[float, float]:
+    """Return a deterministic season-level bootstrap interval for a mean."""
+    rng = np.random.default_rng(random_state)
+    draws = rng.choice(values, size=(bootstrap_runs, len(values)), replace=True)
+    means = draws.mean(axis=1)
+    alpha = (1 - confidence) / 2
+    return float(np.quantile(means, alpha)), float(np.quantile(means, 1 - alpha))
+
+
+def summarize_paired_comparisons(details: pd.DataFrame) -> pd.DataFrame:
+    """Compare each method with the naïve baseline on identical test seasons."""
+    baseline = (
+        details.loc[details["model"] == NAIVE_BASELINE_NAME]
+        .set_index("test_year")[["rmse", "spearman"]]
+        .rename(columns={"rmse": "baseline_rmse", "spearman": "baseline_spearman"})
+    )
+    rows = []
+    for model_name, model_rows in details.groupby("model", sort=False):
+        if model_name == NAIVE_BASELINE_NAME:
+            continue
+        paired = model_rows.set_index("test_year")[["rmse", "spearman"]].join(
+            baseline, how="inner"
+        )
+        spearman_delta = (paired["spearman"] - paired["baseline_spearman"]).to_numpy()
+        rmse_delta = (paired["rmse"] - paired["baseline_rmse"]).to_numpy()
+        spearman_low, spearman_high = _paired_mean_interval(spearman_delta)
+        rmse_low, rmse_high = _paired_mean_interval(rmse_delta)
+        rows.append(
+            {
+                "model": model_name,
+                "test_seasons": len(paired),
+                "mean_spearman_delta_vs_naive": spearman_delta.mean(),
+                "spearman_delta_ci95_low": spearman_low,
+                "spearman_delta_ci95_high": spearman_high,
+                "spearman_wins": int((spearman_delta > 0).sum()),
+                "spearman_ties": int(np.isclose(spearman_delta, 0).sum()),
+                "spearman_losses": int((spearman_delta < 0).sum()),
+                "mean_rmse_delta_vs_naive": rmse_delta.mean(),
+                "rmse_delta_ci95_low": rmse_low,
+                "rmse_delta_ci95_high": rmse_high,
+                "rmse_wins": int((rmse_delta < 0).sum()),
+                "rmse_ties": int(np.isclose(rmse_delta, 0).sum()),
+                "rmse_losses": int((rmse_delta > 0).sum()),
+            }
+        )
+    return (
+        pd.DataFrame(rows)
+        .sort_values("mean_spearman_delta_vs_naive", ascending=False)
+        .round(3)
+    )
+
+
+def create_baseline_comparison_chart(
+    details: pd.DataFrame,
+    output_path: Path,
+) -> Path:
+    """Plot each model's paired per-season Spearman delta versus the baseline."""
+    plot_data = details.loc[details["model"] != NAIVE_BASELINE_NAME].copy()
+    fig, ax = plt.subplots(figsize=(11, 6))
+    for model_name, group in plot_data.groupby("model", sort=False):
+        ax.plot(
+            group["test_year"],
+            group["spearman_delta_vs_naive"],
+            marker="o",
+            linewidth=1.8,
+            label=model_name,
+        )
+    ax.axhline(0, color="#172033", linewidth=1, linestyle="--")
+    ax.set(
+        title="Per-season ranking performance versus naïve final-order baseline",
+        xlabel="Held-out test season",
+        ylabel="Spearman Δ (model − naïve baseline)",
+    )
+    ax.grid(axis="y", alpha=0.25)
+    ax.legend(frameon=False, fontsize=8, ncol=2)
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=180)
+    plt.close(fig)
+    return output_path
+
+
 def run_evaluation(
     features_path: Path = DEFAULT_FEATURES_PATH,
     output_path: Path = DEFAULT_OUTPUT_PATH,
@@ -106,11 +199,18 @@ def run_evaluation(
         raise ValueError("No tier rolling-origin evaluation rows were produced.")
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    details_path = output_path.with_name(f"{output_path.stem}_details{output_path.suffix}")
+    details_path = output_path.with_name(
+        f"{output_path.stem}_details{output_path.suffix}"
+    )
     tier_output_path = output_path.with_name("tier_rolling_origin_summary.csv")
     tier_details_path = output_path.with_name("tier_rolling_origin_summary_details.csv")
-    tier_class_output_path = output_path.with_name("tier_rolling_origin_class_summary.csv")
+    tier_class_output_path = output_path.with_name(
+        "tier_rolling_origin_class_summary.csv"
+    )
+    paired_output_path = output_path.with_name("model_vs_naive_summary.csv")
+    paired_chart_path = output_path.with_name("model_vs_naive_by_season.png")
     summary = summarize_results(details)
+    paired_summary = summarize_paired_comparisons(details)
     tier_summary = summarize_tier_results(tier_details)
     tier_class_summary = summarize_tier_classes(tier_details)
     summary.to_csv(output_path, index=False)
@@ -118,6 +218,8 @@ def run_evaluation(
     tier_summary.to_csv(tier_output_path, index=False)
     tier_details.to_csv(tier_details_path, index=False)
     tier_class_summary.to_csv(tier_class_output_path, index=False)
+    paired_summary.to_csv(paired_output_path, index=False)
+    create_baseline_comparison_chart(details, paired_chart_path)
 
     logger.info("Saved summary -> %s", output_path)
     logger.info("Saved per-season details -> %s", details_path)
@@ -125,8 +227,11 @@ def run_evaluation(
     logger.info("Saved tier summary -> %s", tier_output_path)
     logger.info("Saved tier per-season details -> %s", tier_details_path)
     logger.info("Saved tier class summary -> %s", tier_class_output_path)
+    logger.info("Saved paired baseline comparison -> %s", paired_output_path)
+    logger.info("Saved paired baseline chart -> %s", paired_chart_path)
     logger.info("\n%s", tier_summary.to_string(index=False))
     logger.info("\n%s", tier_class_summary.to_string(index=False))
+    logger.info("\n%s", paired_summary.to_string(index=False))
     return summary
 
 

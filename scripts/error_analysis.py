@@ -42,10 +42,10 @@ def annotate_driver_context(
         .nunique()
         .reset_index(name="constructor_count")
     )
-    annotated = annotated.merge(
-        constructor_counts, on=["year", "driverId"], how="left"
+    annotated = annotated.merge(constructor_counts, on=["year", "driverId"], how="left")
+    annotated["constructor_count"] = (
+        annotated["constructor_count"].fillna(0).astype(int)
     )
-    annotated["constructor_count"] = annotated["constructor_count"].fillna(0).astype(int)
     annotated["mid_season_swap"] = annotated["constructor_count"] > 1
     annotated["regulation_change_year"] = annotated["year"].isin(
         REGULATION_CHANGE_YEARS
@@ -81,9 +81,7 @@ def generate_error_rows(
         output["absolute_error"] = (
             output["predicted_position"] - output["champ_position"]
         ).abs()
-        output["signed_error"] = (
-            output["predicted_position"] - output["champ_position"]
-        )
+        output["signed_error"] = output["predicted_position"] - output["champ_position"]
         output["actual_tier"] = output["champ_position"].apply(assign_tier)
         rows.append(output)
 
@@ -91,9 +89,9 @@ def generate_error_rows(
         raise ValueError("No walk-forward error rows were produced.")
 
     errors = pd.concat(rows, ignore_index=True)
-    errors["predicted_rank"] = errors.groupby("test_year")[
-        "predicted_position"
-    ].rank(method="first", ascending=True)
+    errors["predicted_rank"] = errors.groupby("test_year")["predicted_position"].rank(
+        method="first", ascending=True
+    )
     return errors
 
 
@@ -122,9 +120,7 @@ def summarize_seasons(errors: pd.DataFrame) -> pd.DataFrame:
                 "swap_mae": group.loc[
                     group["mid_season_swap"], "absolute_error"
                 ].mean(),
-                "regulation_change_year": bool(
-                    group["regulation_change_year"].iloc[0]
-                ),
+                "regulation_change_year": bool(group["regulation_change_year"].iloc[0]),
             }
         )
     return pd.DataFrame(rows).round(3)
@@ -215,8 +211,12 @@ def run_error_analysis(
     season_summary.to_csv(output_dir / "error_analysis_season_summary.csv", index=False)
     group_summary.to_csv(output_dir / "error_analysis_group_summary.csv", index=False)
     logger.info("Saved driver errors -> %s", output_dir / "error_analysis_driver.csv")
-    logger.info("Saved season summary -> %s", output_dir / "error_analysis_season_summary.csv")
-    logger.info("Saved group summary -> %s", output_dir / "error_analysis_group_summary.csv")
+    logger.info(
+        "Saved season summary -> %s", output_dir / "error_analysis_season_summary.csv"
+    )
+    logger.info(
+        "Saved group summary -> %s", output_dir / "error_analysis_group_summary.csv"
+    )
     return errors, season_summary, group_summary
 
 
@@ -224,12 +224,8 @@ def main() -> int:
     """Run the error-analysis command."""
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--features", type=Path, default=DEFAULT_FEATURES_PATH
-    )
-    parser.add_argument(
-        "--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR
-    )
+    parser.add_argument("--features", type=Path, default=DEFAULT_FEATURES_PATH)
+    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--test-seasons", type=int, default=10)
     parser.add_argument("--min-train-seasons", type=int, default=20)
     args = parser.parse_args()
