@@ -19,6 +19,11 @@ HTML report, regression and tier rolling-origin evaluation files, and
 and package versions, data snapshot, row/season counts, evaluation summary,
 and generated artifact paths.
 
+The full build also runs the slower historical model audit: 100 season-level
+bootstrap refits per held-out season, rolling conformal coverage, Brier scores,
+and held-out permutation importance. Use `python main.py --year YEAR --report`
+for a quicker local forecast when those audit artifacts are already available.
+
 ## GitHub Actions artifact build
 
 The manual **Build release report** workflow runs the same process on Ubuntu
@@ -34,9 +39,13 @@ Before sharing a report:
 - Inspect the generated HTML report and chart.
 - Review `release_manifest.json` for the intended commit and data snapshot.
 - Confirm the rolling baseline comparison is included.
+- Confirm paired confidence intervals and season win/loss counts are included.
 - Confirm the tier accuracy, macro F1, and per-tier F1 tables are included.
 - Confirm the bootstrap uncertainty table and run count are included.
+- Confirm historical bootstrap/conformal coverage and Brier scores are included.
+- Confirm held-out permutation importance replaces impurity importance.
 - Confirm the “Where this model breaks” error-analysis tables are included.
+- Confirm every raw CSV checksum matches `data/raw/data_manifest.json`.
 - State that the report is historical analysis, not a live or betting system.
 
 ## Monitoring boundary

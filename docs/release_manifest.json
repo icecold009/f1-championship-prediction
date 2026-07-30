@@ -1,0 +1,176 @@
+{
+  "prediction_year": 2023,
+  "git_commit": "99d83617dcb444b3369f1f494fbcb5c2bf87ce7c",
+  "generated_at_utc": "2026-07-30T16:41:47.902187+00:00",
+  "python_version": "3.13.12",
+  "packages": {
+    "numpy": "2.4.6",
+    "pandas": "3.0.3",
+    "scikit-learn": "1.9.0",
+    "scipy": "1.18.0",
+    "matplotlib": "3.11.0"
+  },
+  "data": {
+    "source": "https://www.kaggle.com/datasets/jtrotman/formula-1-race-data",
+    "downloaded_at_utc": "unknown",
+    "source_etag": null,
+    "source_last_modified": null,
+    "archive_sha256": "unknown",
+    "raw_files": {
+      "circuits.csv": {
+        "sha256": "8a2ac67a0946ac238ddeaa4a212a1f3969f0108527b0213e7a38b3a5c3cba6eb",
+        "bytes": 10104
+      },
+      "constructor_results.csv": {
+        "sha256": "8f1ebc0ce822bc02326b9bf13616f22a81514a6d35e5b744fd6f627b9ef99634",
+        "bytes": 219365
+      },
+      "constructor_standings.csv": {
+        "sha256": "9f07b1b9f235625165f62c6fcd6b1938cd7daa6f7e4a580f9937c6268056de9b",
+        "bytes": 317206
+      },
+      "constructors.csv": {
+        "sha256": "ae423f6f2d6cd74d5cd594eac0bdec7e1e9be2cda3097eb69f870294a225618c",
+        "bytes": 17478
+      },
+      "driver_standings.csv": {
+        "sha256": "58397ed38d29f71316ba272a2ffd5bd00b6174774d919ce079ae4d3cfb27befb",
+        "bytes": 883771
+      },
+      "drivers.csv": {
+        "sha256": "6a894569cb031dd65fb5f113f57b235100966653eaedd9310503dc2e94afae6b",
+        "bytes": 94367
+      },
+      "lap_times.csv": {
+        "sha256": "70a772924f67682701acf1a6f26e8225ffd1b9f50844b2f9fb42ce311333cc33",
+        "bytes": 17622395
+      },
+      "pit_stops.csv": {
+        "sha256": "70cff48b96416d46b8f6f162e778fcee45582b8fa85e9ec4a5e2c7b60bead75c",
+        "bytes": 443719
+      },
+      "qualifying.csv": {
+        "sha256": "49c4ff9ae0be93d5f850f56c553d5e264914c7ba0c4d583462f3de06aebed3cc",
+        "bytes": 465231
+      },
+      "races.csv": {
+        "sha256": "4839d035abc603fa88fa08fa976a86d76cff35f3e94cb767d25f735a5a3376ef",
+        "bytes": 164344
+      },
+      "results.csv": {
+        "sha256": "a2392658044286800a0a946138067d9823f39e59147eeef0cbdda858ff172441",
+        "bytes": 1721961
+      },
+      "seasons.csv": {
+        "sha256": "9562d2374cced42e24988fb2325cca5c82455815a5f5d40f6a6f5262a36106dc",
+        "bytes": 4594
+      },
+      "sprint_results.csv": {
+        "sha256": "4a20b577098bafd2683c4f4ac1bb1cf4b2e8cc6a13c91c16878c7b2b21a24647",
+        "bytes": 24732
+      },
+      "status.csv": {
+        "sha256": "c36b1287f2421a288c38b0ce875d6ed04ff26bbda3e06db3d99e12197ea894aa",
+        "bytes": 2136
+      }
+    },
+    "rows": 3211,
+    "season_min": 1950,
+    "season_max": 2024,
+    "season_count": 75
+  },
+  "evaluation": [
+    {
+      "model": "Naive: previous-season final order",
+      "test_seasons": 10,
+      "mean_rmse": 3.758,
+      "rmse_sd": 0.747,
+      "mean_r2": 0.641,
+      "r2_sd": 0.161,
+      "mean_spearman": 0.821,
+      "spearman_sd": 0.081,
+      "mean_spearman_delta_vs_naive": 0.0,
+      "spearman_delta_vs_naive_sd": 0.0
+    },
+    {
+      "model": "Random Forest (history only)",
+      "test_seasons": 10,
+      "mean_rmse": 6.657,
+      "rmse_sd": 2.818,
+      "mean_r2": -0.277,
+      "r2_sd": 1.042,
+      "mean_spearman": 0.808,
+      "spearman_sd": 0.061,
+      "mean_spearman_delta_vs_naive": -0.012,
+      "spearman_delta_vs_naive_sd": 0.065
+    },
+    {
+      "model": "Random Forest + cold-start flags",
+      "test_seasons": 10,
+      "mean_rmse": 6.531,
+      "rmse_sd": 2.704,
+      "mean_r2": -0.217,
+      "r2_sd": 0.998,
+      "mean_spearman": 0.807,
+      "spearman_sd": 0.051,
+      "mean_spearman_delta_vs_naive": -0.014,
+      "spearman_delta_vs_naive_sd": 0.055
+    },
+    {
+      "model": "Gradient Boosting",
+      "test_seasons": 10,
+      "mean_rmse": 6.938,
+      "rmse_sd": 2.63,
+      "mean_r2": -0.346,
+      "r2_sd": 1.028,
+      "mean_spearman": 0.784,
+      "spearman_sd": 0.058,
+      "mean_spearman_delta_vs_naive": -0.036,
+      "spearman_delta_vs_naive_sd": 0.084
+    },
+    {
+      "model": "Baseline: previous avg finish",
+      "test_seasons": 10,
+      "mean_rmse": 4.564,
+      "rmse_sd": 0.875,
+      "mean_r2": 0.462,
+      "r2_sd": 0.273,
+      "mean_spearman": 0.783,
+      "spearman_sd": 0.085,
+      "mean_spearman_delta_vs_naive": -0.038,
+      "spearman_delta_vs_naive_sd": 0.031
+    },
+    {
+      "model": "Ridge",
+      "test_seasons": 10,
+      "mean_rmse": 9.517,
+      "rmse_sd": 2.178,
+      "mean_r2": -1.359,
+      "r2_sd": 1.235,
+      "mean_spearman": 0.777,
+      "spearman_sd": 0.057,
+      "mean_spearman_delta_vs_naive": -0.043,
+      "spearman_delta_vs_naive_sd": 0.066
+    }
+  ],
+  "artifacts": {
+    "prediction": "results\\2023_predictions.csv",
+    "chart": "results\\predicted_vs_actual_2023.png",
+    "report": "results\\f1_prediction_report_2023.html",
+    "evaluation_summary": "results/rolling_origin_summary.csv",
+    "evaluation_details": "results/rolling_origin_summary_details.csv",
+    "tier_evaluation_summary": "results/tier_rolling_origin_summary.csv",
+    "tier_evaluation_details": "results/tier_rolling_origin_summary_details.csv",
+    "tier_class_summary": "results/tier_rolling_origin_class_summary.csv",
+    "error_analysis_driver": "results/error_analysis_driver.csv",
+    "error_analysis_season": "results/error_analysis_season_summary.csv",
+    "error_analysis_group": "results/error_analysis_group_summary.csv",
+    "paired_baseline_summary": "results/model_vs_naive_summary.csv",
+    "paired_baseline_chart": "results/model_vs_naive_by_season.png",
+    "uncertainty_calibration_summary": "results/uncertainty_calibration_summary.csv",
+    "uncertainty_calibration_details": "results/uncertainty_calibration_driver.csv",
+    "uncertainty_calibration_bins": "results/uncertainty_calibration_bins.csv",
+    "permutation_importance_summary": "results/permutation_importance_summary.csv",
+    "permutation_importance_details": "results/permutation_importance_details.csv"
+  }
+}
