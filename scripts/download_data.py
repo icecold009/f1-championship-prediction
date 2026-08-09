@@ -126,6 +126,8 @@ def download_data(output_dir: Path = DEFAULT_OUTPUT_DIR) -> None:
 
     with tempfile.TemporaryDirectory() as temp_dir:
         archive_path = Path(temp_dir) / "formula-1-race-data.zip"
+        staging_dir = Path(temp_dir) / "staged"
+        staging_dir.mkdir()
         logger.info("Downloading dataset from %s", DATASET_URL)
         with (
             urlopen(request, timeout=120) as response,
@@ -144,12 +146,16 @@ def download_data(output_dir: Path = DEFAULT_OUTPUT_DIR) -> None:
                 )
 
             for filename in REQUIRED_FILES:
-                target = output_dir / filename
+                target = staging_dir / filename
                 with (
                     archive.open(members[filename]) as source,
                     target.open("wb") as destination,
                 ):
                     shutil.copyfileobj(source, destination)
+
+        validate_raw_schema(staging_dir)
+        for filename in REQUIRED_FILES:
+            (staging_dir / filename).replace(output_dir / filename)
 
         write_data_manifest(
             output_dir,
