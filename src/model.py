@@ -324,8 +324,9 @@ def evaluate_tier_rolling_origin(
 
 def train_model(
     forecast_year: int | None = None,
+    skip_rolling_evaluation: bool = False,
 ) -> tuple[object | None, RandomForestClassifier]:
-    """Train, evaluate, and save models without using the forecast season."""
+    """Train and save models, optionally skipping rolling-origin evaluation."""
     # ── Load ──────────────────────────────────────────────────────────────
     features_path = os.path.join(PROC_DIR, "features.csv")
     df = pd.read_csv(features_path)
@@ -365,39 +366,40 @@ def train_model(
     y_train = train_df["champ_position"]
     yt_train = train_df["champ_position"].apply(assign_tier)
 
-    # ── Leak-free rolling-origin metrics ──────────────────────────────────
-    rolling_results = evaluate_rolling_origin(df)
-    logger.info(
-        "\n── Rolling-origin backtest (%s seasons; baselines included) ───",
-        rolling_results["test_year"].nunique(),
-    )
-    rolling_summary = rolling_results.groupby("model")[
-        ["rmse", "r2", "spearman", "spearman_delta_vs_naive"]
-    ].agg(["mean", "std"])
-    for model_name, metrics in rolling_summary.iterrows():
+    if not skip_rolling_evaluation:
+        # ── Leak-free rolling-origin metrics ──────────────────────────────
+        rolling_results = evaluate_rolling_origin(df)
         logger.info(
-            "  %-24s | RMSE: %.3f +/- %.3f | R²: %.3f +/- %.3f | Spearman: %.3f +/- %.3f | Δ naive: %.3f +/- %.3f",
-            model_name,
-            metrics[("rmse", "mean")],
-            metrics[("rmse", "std")],
-            metrics[("r2", "mean")],
-            metrics[("r2", "std")],
-            metrics[("spearman", "mean")],
-            metrics[("spearman", "std")],
-            metrics[("spearman_delta_vs_naive", "mean")],
-            metrics[("spearman_delta_vs_naive", "std")],
+            "\n── Rolling-origin backtest (%s seasons; baselines included) ───",
+            rolling_results["test_year"].nunique(),
         )
+        rolling_summary = rolling_results.groupby("model")[
+            ["rmse", "r2", "spearman", "spearman_delta_vs_naive"]
+        ].agg(["mean", "std"])
+        for model_name, metrics in rolling_summary.iterrows():
+            logger.info(
+                "  %-24s | RMSE: %.3f +/- %.3f | R²: %.3f +/- %.3f | Spearman: %.3f +/- %.3f | Δ naive: %.3f +/- %.3f",
+                model_name,
+                metrics[("rmse", "mean")],
+                metrics[("rmse", "std")],
+                metrics[("r2", "mean")],
+                metrics[("r2", "std")],
+                metrics[("spearman", "mean")],
+                metrics[("spearman", "std")],
+                metrics[("spearman_delta_vs_naive", "mean")],
+                metrics[("spearman_delta_vs_naive", "std")],
+            )
 
-    tier_results = evaluate_tier_rolling_origin(df)
-    tier_summary = tier_results.groupby("model").agg(
-        test_seasons=("test_year", "nunique"),
-        mean_accuracy=("accuracy", "mean"),
-        accuracy_sd=("accuracy", "std"),
-        mean_macro_f1=("macro_f1", "mean"),
-        macro_f1_sd=("macro_f1", "std"),
-    )
-    logger.info("\n── Tier classification walk-forward metrics ────────────────")
-    logger.info("\n%s", tier_summary.round(3).to_string())
+        tier_results = evaluate_tier_rolling_origin(df)
+        tier_summary = tier_results.groupby("model").agg(
+            test_seasons=("test_year", "nunique"),
+            mean_accuracy=("accuracy", "mean"),
+            accuracy_sd=("accuracy", "std"),
+            mean_macro_f1=("macro_f1", "mean"),
+            macro_f1_sd=("macro_f1", "std"),
+        )
+        logger.info("\n── Tier classification walk-forward metrics ────────────────")
+        logger.info("\n%s", tier_summary.round(3).to_string())
 
     # ── Predeclared regression model for the user-facing forecast ─────────
     candidates = _regression_candidates()

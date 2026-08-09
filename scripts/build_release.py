@@ -75,6 +75,7 @@ def build_release(
     year: int = 2023,
     download: bool = False,
     allow_dirty: bool = False,
+    full_audit: bool = False,
 ) -> Path:
     """Regenerate all artifacts, validate them, and write a provenance manifest."""
     if download:
@@ -101,16 +102,17 @@ def build_release(
     logger.info("Building processed features")
     features = create_features(*load_raw_data())
     logger.info("Training saved models")
-    train_model(forecast_year=year)
+    train_model(forecast_year=year, skip_rolling_evaluation=True)
     logger.info("Generating prediction and report artifacts")
     prediction = predict_championship(year)
     if prediction is None:
         raise RuntimeError(f"No prediction was produced for season {year}.")
     summary = run_evaluation(features_path=Path(PROC_DIR) / "features.csv")
-    run_model_audit(
-        features_path=Path(PROC_DIR) / "features.csv",
-        output_dir=RESULTS_DIR,
-    )
+    if full_audit:
+        run_model_audit(
+            features_path=Path(PROC_DIR) / "features.csv",
+            output_dir=RESULTS_DIR,
+        )
     run_error_analysis(
         features_path=Path(PROC_DIR) / "features.csv",
         output_dir=RESULTS_DIR,
@@ -207,12 +209,18 @@ def main() -> int:
         action="store_true",
         help="Allow building from a dirty Git worktree and record that state",
     )
+    parser.add_argument(
+        "--full-audit",
+        action="store_true",
+        help="Run the slow calibration and permutation-importance audit",
+    )
     args = parser.parse_args()
     try:
         build_release(
             year=args.year,
             download=args.download,
             allow_dirty=args.allow_dirty,
+            full_audit=args.full_audit,
         )
     except (FileNotFoundError, RuntimeError, ValueError) as exc:
         logger.error("Release build failed: %s", exc)

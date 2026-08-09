@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pandas as pd
 import pytest
@@ -95,6 +96,27 @@ def test_build_release_logs_prior_manifest_supersession(tmp_path, monkeypatch, c
         build_release.build_release()
 
     assert "supersedes the prior release manifest" in caplog.text
+
+
+def test_build_release_uses_fast_path_and_optional_full_audit(tmp_path, monkeypatch):
+    _stub_build_release(monkeypatch, tmp_path)
+    train_model_mock = Mock()
+    audit_mock = Mock()
+    monkeypatch.setattr(build_release, "train_model", train_model_mock)
+    monkeypatch.setattr(build_release, "run_model_audit", audit_mock)
+    monkeypatch.setattr(build_release, "_is_dirty_worktree", lambda: False)
+    monkeypatch.setattr(build_release, "_git_commit", lambda: "current-commit")
+
+    build_release.build_release()
+    train_model_mock.assert_called_once_with(
+        forecast_year=2023,
+        skip_rolling_evaluation=True,
+    )
+    audit_mock.assert_not_called()
+
+    build_release.build_release(full_audit=True)
+    assert train_model_mock.call_count == 2
+    assert audit_mock.call_count == 1
 
 
 def test_validate_release_reports_missing_artifacts(tmp_path):

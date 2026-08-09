@@ -1,8 +1,11 @@
+from unittest.mock import Mock
+
 import numpy as np
 import pandas as pd
 import pytest
+from sklearn.ensemble import RandomForestRegressor
 
-from src import predict
+from src import model, predict
 from src.model import (
     FEATURE_COLUMNS,
     NAIVE_BASELINE_NAME,
@@ -131,3 +134,63 @@ def test_load_models_reports_missing_artifacts(tmp_path, monkeypatch):
 
     with pytest.raises(RuntimeError, match="Run `python src/model.py` first"):
         predict.load_models()
+
+
+def test_train_model_can_skip_rolling_evaluation(tmp_path, monkeypatch):
+    rows = []
+    for year in (2020, 2021, 2022, 2023):
+        for driver_id, position in ((1, 1), (2, 2)):
+            row = {
+                "year": year,
+                "driverId": driver_id,
+                "champ_position": position,
+            }
+            row.update({column: float(driver_id) for column in FEATURE_COLUMNS})
+            rows.append(row)
+    pd.DataFrame(rows).to_csv(tmp_path / "features.csv", index=False)
+    monkeypatch.setattr(model, "PROC_DIR", str(tmp_path))
+    monkeypatch.setattr(model, "MODEL_DIR", str(tmp_path / "models"))
+    (tmp_path / "models").mkdir()
+
+    monkeypatch.setattr(
+        model,
+        "_regression_candidates",
+        lambda: {
+            "Random Forest + cold-start flags": (
+                RandomForestRegressor(n_estimators=1, random_state=42),
+                FEATURE_COLUMNS,
+            )
+        },
+    )
+    rolling_mock = Mock(
+        return_value=pd.DataFrame(
+            {
+                "test_year": [2023],
+                "model": ["fake"],
+                "rmse": [1.0],
+                "r2": [1.0],
+                "spearman": [1.0],
+                "spearman_delta_vs_naive": [0.0],
+            }
+        )
+    )
+    tier_mock = Mock(
+        return_value=pd.DataFrame(
+            {
+                "test_year": [2023],
+                "model": ["fake"],
+                "accuracy": [1.0],
+                "macro_f1": [1.0],
+            }
+        )
+    )
+    monkeypatch.setattr(model, "evaluate_rolling_origin", rolling_mock)
+    monkeypatch.setattr(model, "evaluate_tier_rolling_origin", tier_mock)
+
+    model.train_model(forecast_year=2023, skip_rolling_evaluation=True)
+    rolling_mock.assert_not_called()
+    tier_mock.assert_not_called()
+
+    model.train_model(forecast_year=2023)
+    rolling_mock.assert_called_once()
+    tier_mock.assert_called_once()
