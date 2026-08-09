@@ -44,6 +44,22 @@ def _git_commit() -> str:
         return "unknown"
 
 
+def _is_dirty_worktree() -> bool:
+    """Return whether the checkout has uncommitted changes."""
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=BASE_DIR,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return bool(result.stdout.strip())
+    except (OSError, subprocess.CalledProcessError):
+        logger.warning("Unable to inspect Git worktree status; treating it as dirty.")
+        return True
+
+
 def _package_versions() -> dict[str, str]:
     """Collect installed versions for the libraries used by the pipeline."""
     packages = ("numpy", "pandas", "scikit-learn", "scipy", "matplotlib")
@@ -55,12 +71,23 @@ def prediction_path(year: int) -> Path:
     return RESULTS_DIR / f"{year}_predictions.csv"
 
 
-def build_release(year: int = 2023, download: bool = False) -> Path:
+def build_release(
+    year: int = 2023,
+    download: bool = False,
+    allow_dirty: bool = False,
+) -> Path:
     """Regenerate all artifacts, validate them, and write a provenance manifest."""
     if download:
         from download_data import download_data
 
         download_data()
+    worktree_dirty = _is_dirty_worktree()
+    if worktree_dirty and not allow_dirty:
+        raise RuntimeError(
+            "Refusing to build a release from a dirty Git worktree; "
+            "commit your changes or pass --allow-dirty."
+        )
+
     raw_manifest_path = BASE_DIR / "data" / "raw" / "data_manifest.json"
     if not raw_manifest_path.exists():
         write_data_manifest(
@@ -92,6 +119,20 @@ def build_release(year: int = 2023, download: bool = False) -> Path:
     report_path = create_report(year)
 
     manifest_path = RESULTS_DIR / "release_manifest.json"
+    current_git_commit = _git_commit()
+    if manifest_path.exists():
+        try:
+            prior_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            prior_manifest = {}
+        prior_git_commit = prior_manifest.get("git_commit")
+        if prior_git_commit and prior_git_commit != current_git_commit:
+            logger.info(
+                "This build supersedes the prior release manifest from Git commit "
+                "%s with current commit %s.",
+                prior_git_commit,
+                current_git_commit,
+            )
     source_manifest = (
         json.loads(raw_manifest_path.read_text(encoding="utf-8"))
         if raw_manifest_path.exists()
@@ -99,7 +140,7 @@ def build_release(year: int = 2023, download: bool = False) -> Path:
     )
     manifest = {
         "prediction_year": year,
-        "git_commit": _git_commit(),
+        "git_commit": current_git_commit,
         "generated_at_utc": datetime.now(UTC).isoformat(),
         "python_version": platform.python_version(),
         "packages": _package_versions(),
@@ -137,6 +178,8 @@ def build_release(year: int = 2023, download: bool = False) -> Path:
             "permutation_importance_details": "results/permutation_importance_details.csv",
         },
     }
+    if worktree_dirty:
+        manifest["worktree_dirty"] = True
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
@@ -159,9 +202,18 @@ def main() -> int:
         action="store_true",
         help="Download the raw dataset before building",
     )
+    parser.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help="Allow building from a dirty Git worktree and record that state",
+    )
     args = parser.parse_args()
     try:
-        build_release(year=args.year, download=args.download)
+        build_release(
+            year=args.year,
+            download=args.download,
+            allow_dirty=args.allow_dirty,
+        )
     except (FileNotFoundError, RuntimeError, ValueError) as exc:
         logger.error("Release build failed: %s", exc)
         return 1

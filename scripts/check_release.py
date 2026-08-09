@@ -36,7 +36,11 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def validate_release(base_dir: Path = BASE_DIR, year: int = 2023) -> list[str]:
+def validate_release(
+    base_dir: Path = BASE_DIR,
+    year: int = 2023,
+    reject_dirty_manifest: bool = False,
+) -> list[str]:
     """Return actionable errors for a release directory, or an empty list."""
     raw_dir = base_dir / "data" / "raw"
     processed_dir = base_dir / "data" / "processed"
@@ -107,6 +111,7 @@ def validate_release(base_dir: Path = BASE_DIR, year: int = 2023) -> list[str]:
                 + ", ".join(missing_prediction_columns)
             )
 
+    release_manifest_path = results_dir / "release_manifest.json"
     for filename in (
         f"predicted_vs_actual_{year}.png",
         f"f1_prediction_report_{year}.html",
@@ -125,10 +130,20 @@ def validate_release(base_dir: Path = BASE_DIR, year: int = 2023) -> list[str]:
         "uncertainty_calibration_bins.csv",
         "permutation_importance_details.csv",
         "permutation_importance_summary.csv",
-        "release_manifest.json",
+        release_manifest_path.name,
     ):
         if not (results_dir / filename).exists():
             errors.append(f"Missing release artifact: results/{filename}")
+
+    if reject_dirty_manifest and release_manifest_path.exists():
+        try:
+            release_manifest = json.loads(
+                release_manifest_path.read_text(encoding="utf-8")
+            )
+        except (json.JSONDecodeError, OSError):
+            release_manifest = {}
+        if release_manifest.get("worktree_dirty") is True:
+            errors.append("Release manifest was generated from a dirty Git worktree")
 
     return errors
 
@@ -140,9 +155,17 @@ def main() -> int:
     parser.add_argument(
         "--year", type=int, default=2023, help="Prediction season to validate"
     )
+    parser.add_argument(
+        "--reject-dirty-manifest",
+        action="store_true",
+        help="Fail if the release manifest records a dirty Git worktree",
+    )
     args = parser.parse_args()
 
-    errors = validate_release(year=args.year)
+    errors = validate_release(
+        year=args.year,
+        reject_dirty_manifest=args.reject_dirty_manifest,
+    )
     if errors:
         logger.error("Release check failed:")
         for error in errors:
