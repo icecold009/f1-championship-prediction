@@ -11,11 +11,11 @@ forecast the final Formula 1 Drivers’ Championship order.
 
 The strongest result is a negative one: a naïve “repeat last season’s order”
 baseline remains stronger overall than the fitted models. Across ten untouched
-future seasons (2015–2024), the baseline reaches mean Spearman ρ **0.821**,
-compared with **0.808** for the history-only Random Forest and **0.807** after
-adding cold-start flags. The history-only forest wins five seasons and loses
-five, but its paired 95% interval for mean Spearman improvement spans
-**−0.051 to +0.026**. On RMSE, it loses nine of ten seasons.
+future seasons (2016–2025), the baseline reaches mean Spearman ρ **0.821**,
+compared with **0.807** for the history-only Random Forest and **0.811** after
+adding cold-start flags. The history-only forest wins four seasons and loses
+six, but its paired 95% interval for mean Spearman improvement spans
+**−0.057 to +0.029**. On RMSE, it loses eight of ten seasons.
 
 That makes this project an exercise in trustworthy forecasting rather than an
 algorithm leaderboard: every season is held out intact, uncertainty is
@@ -170,7 +170,7 @@ Every reported metric uses the same leak-free walk-forward protocol. For each
 test season **N+1**, the model is trained on all available seasons through **N**;
 all rows from the test season remain together and never appear in training.
 The reported values are the mean and standard deviation across ten chronological
-test seasons, 2015–2024. RMSE measures position error, R² measures explained
+test seasons, 2016–2025. RMSE measures position error, R² measures explained
 position variance, and Spearman ρ measures agreement in predicted order.
 
 The primary naïve baseline is **previous-season final order**: rank the current
@@ -181,17 +181,17 @@ is each row's Spearman ρ minus that naïve baseline on the same test season.
 
 | Model / baseline | Test seasons | Mean RMSE | RMSE SD | Mean R² | R² SD | Mean Spearman ρ | Spearman SD | Mean Δ vs naïve | Δ SD |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Naive: previous-season final order | 10 | 3.758 | 0.747 | 0.641 | 0.161 | 0.821 | 0.081 | 0.000 | 0.000 |
-| Random Forest (history only) | 10 | 6.657 | 2.818 | -0.277 | 1.042 | 0.808 | 0.061 | -0.012 | 0.065 |
-| Random Forest + cold-start flags | 10 | 6.531 | 2.704 | -0.217 | 0.998 | 0.807 | 0.051 | -0.014 | 0.055 |
-| Gradient Boosting | 10 | 6.938 | 2.630 | -0.346 | 1.028 | 0.784 | 0.058 | -0.036 | 0.084 |
-| Baseline: previous avg finish | 10 | 4.564 | 0.875 | 0.462 | 0.273 | 0.783 | 0.085 | -0.038 | 0.031 |
-| Ridge | 10 | 9.517 | 2.178 | -1.359 | 1.235 | 0.777 | 0.057 | -0.043 | 0.066 |
+| Naive: previous-season final order | 10 | 3.728 | 0.744 | 0.641 | 0.168 | 0.821 | 0.084 | 0.000 | 0.000 |
+| Random Forest (history only) | 10 | 6.189 | 2.301 | -0.071 | 0.823 | 0.807 | 0.058 | -0.014 | 0.074 |
+| Random Forest + cold-start flags | 10 | 5.982 | 1.969 | 0.026 | 0.668 | 0.811 | 0.045 | -0.010 | 0.065 |
+| Gradient Boosting | 10 | 6.302 | 2.087 | -0.089 | 0.754 | 0.757 | 0.095 | -0.064 | 0.113 |
+| Baseline: previous avg finish | 10 | 4.543 | 0.706 | 0.466 | 0.247 | 0.788 | 0.073 | -0.033 | 0.025 |
+| Ridge | 10 | 9.081 | 1.572 | -1.135 | 1.018 | 0.734 | 0.090 | -0.087 | 0.061 |
 
 The naïve previous-season-order baseline remains stronger than every machine
 learning regressor in this walk-forward evaluation. The cold-start flags reduce
-Random Forest RMSE by **0.126 positions** but do not improve mean rank
-correlation. That mixed ablation result is retained rather than presenting the
+Random Forest RMSE by **0.207 positions** and improve mean rank
+correlation by **0.004** in this refresh. That mixed ablation result is retained rather than presenting the
 new features as a blanket improvement.
 
 ### Paired evidence against the naïve baseline
@@ -202,11 +202,11 @@ than the naïve baseline in that season; an RMSE win means lower error.
 
 | Method | Mean Spearman Δ | Paired 95% CI | Spearman W–L | Mean RMSE Δ | RMSE W–L |
 |---|---:|---:|---:|---:|---:|
-| Random Forest (history only) | -0.012 | [-0.051, 0.026] | 5–5 | +2.898 | 1–9 |
-| Random Forest + cold-start flags | -0.014 | [-0.045, 0.019] | 4–6 | +2.773 | 1–9 |
-| Gradient Boosting | -0.036 | [-0.086, 0.013] | 4–6 | +3.179 | 0–10 |
-| Previous average finish | -0.038 | [-0.056, -0.020] | 1–9 | +0.806 | 0–10 |
-| Ridge | -0.043 | [-0.083, -0.006] | 3–6, 1 tie | +5.759 | 0–10 |
+| Random Forest (history only) | -0.014 | [-0.057, 0.029] | 4–6 | +2.460 | 2–8 |
+| Random Forest + cold-start flags | -0.010 | [-0.047, 0.028] | 4–6 | +2.254 | 2–8 |
+| Gradient Boosting | -0.064 | [-0.132, -0.000] | 2–8 | +2.574 | 1–9 |
+| Previous average finish | -0.033 | [-0.047, -0.019] | 1–9 | +0.815 | 0–10 |
+| Ridge | -0.087 | [-0.123, -0.051] | 0–10 | +5.353 | 0–10 |
 
 ![Per-season model performance versus the naïve baseline](docs/model_vs_naive_by_season.png)
 
@@ -215,27 +215,27 @@ than the naïve baseline in that season; an RMSE win means lower error.
 The tier classifier is also retrained before each test season. Accuracy is the
 fraction of correctly classified drivers, while macro F1 gives each tier equal
 weight. The previous ambiguous “CV Accuracy” value has been removed; these are
-walk-forward test-season metrics only. The mean macro F1 headline is **0.441**,
-but it should not be read as uniform usefulness across tiers. Podium F1 **0.174**
-and Top 5 F1 **0.207** are close to unusable for individual driver
+walk-forward test-season metrics only. The mean macro F1 headline is **0.414**,
+but it should not be read as uniform usefulness across tiers. Podium F1 **0.183**
+and Top 5 F1 **0.217** are close to unusable for individual driver
 classification. This is a 200-tree Random Forest with `max_depth=8`, trained on
 `FEATURE_COLUMNS` from `src/model.py`; the weak results likely reflect class
 imbalance across the six tiers and/or overlapping feature distributions between
-adjacent tiers. Champion F1 **0.800** and Backmarker F1 **0.681** are the tiers
+adjacent tiers. Champion F1 **0.700** and Backmarker F1 **0.685** are the tiers
 where the classifier is genuinely useful for individual driver classification.
 
 | Model | Test seasons | Mean accuracy | Accuracy SD | Mean macro F1 | Macro F1 SD |
 |---|---:|---:|---:|---:|---:|
-| Random Forest | 10 | 0.509 | 0.072 | 0.441 | 0.073 |
+| Random Forest | 10 | 0.498 | 0.083 | 0.414 | 0.078 |
 
 | Tier | Test seasons | Mean F1 | F1 SD |
 |---|---:|---:|---:|
-| Champion | 10 | 0.800 | 0.322 |
-| Podium | 10 | 0.174 | 0.283 |
-| Top 5 | 10 | 0.207 | 0.274 |
-| Top 10 | 10 | 0.511 | 0.143 |
-| Midfield | 10 | 0.271 | 0.193 |
-| Backmarker | 10 | 0.681 | 0.120 |
+| Champion | 10 | 0.700 | 0.399 |
+| Podium | 10 | 0.183 | 0.299 |
+| Top 5 | 10 | 0.217 | 0.284 |
+| Top 10 | 10 | 0.518 | 0.159 |
+| Midfield | 10 | 0.184 | 0.181 |
+| Backmarker | 10 | 0.685 | 0.104 |
 
 The complete per-season values are regenerated by `python scripts/evaluate.py`;
 the training cutoff for every row is retained in
@@ -266,19 +266,19 @@ The result is cautionary:
 
 | Measure | Result |
 |---|---:|
-| Driver-season observations | 223 |
-| Bootstrap P05–P95 coverage | 0.323 |
-| Bootstrap mean interval width | 4.920 positions |
-| Rolling conformal coverage | 0.964 |
-| Rolling conformal mean width | 19.680 positions |
-| Top-3 Brier score | 0.068 |
-| Champion Brier score | 0.019 |
+| Driver-season observations | 222 |
+| Bootstrap P05–P95 coverage | 0.342 |
+| Bootstrap mean interval width | 4.896 positions |
+| Rolling conformal coverage | 0.977 |
+| Rolling conformal mean width | 19.899 positions |
+| Top-3 Brier score | 0.070 |
+| Champion Brier score | 0.021 |
 
 The bootstrap intervals are much too narrow to be interpreted as 90% prediction
 intervals. Rolling conformal intervals recover coverage using only residuals
 available before each test season, but their width makes them weakly informative.
 The highest top-three probability bin is also overconfident: mean predicted
-probability **0.954** versus an observed top-three rate of **0.773** across 22
+probability **0.967** versus an observed top-three rate of **0.789** across 19
 driver-seasons. These findings are why the report labels bootstrap outputs as
 model-sensitivity frequencies rather than calibrated real-world odds.
 
@@ -286,10 +286,10 @@ For the regenerated 2023 artifact, the leading point-forecast rows are:
 
 | Driver | Point rank | Champion | Top 3 | Position P05–P95 |
 |---|---:|---:|---:|---:|
-| Max Verstappen | 1 | 98% | 100% | 1.88–3.75 |
-| Carlos Sainz | 2 | 0% | 45% | 3.92–7.16 |
-| Charles Leclerc | 3 | 2% | 63% | 3.56–7.00 |
-| Sergio Pérez | 4 | 0% | 64% | 3.91–6.32 |
+| Max Verstappen | 1 | 97% | 100% | 1.85–3.63 |
+| Sergio Pérez | 2 | 0% | 49% | 4.19–6.54 |
+| Carlos Sainz | 3 | 0% | 57% | 4.00–7.00 |
+| Charles Leclerc | 4 | 1% | 65% | 3.67–6.96 |
 
 The CSV and HTML report include the same uncertainty fields for every driver.
 
@@ -305,33 +305,33 @@ a driver lower than their actual final position. The labels are not predictors.
 
 | Diagnostic group | Observations | RMSE | MAE | Mean signed error |
 |---|---:|---:|---:|---:|
-| Returning | 179 | 4.718 | 3.198 | 0.618 |
-| Rookie | 33 | 11.264 | 8.571 | 5.506 |
-| Returning after gap | 11 | 15.851 | 12.443 | 10.480 |
-| No mid-season swap | 216 | 7.019 | 4.418 | 1.835 |
-| Mid-season swap | 7 | 6.478 | 5.416 | 1.607 |
-| Other test seasons | 201 | 7.172 | 4.486 | 1.839 |
-| 2022 regulation-change season | 22 | 5.209 | 4.117 | 1.723 |
+| Returning | 180 | 4.343 | 3.138 | 0.760 |
+| Rookie | 31 | 9.219 | 7.362 | 4.129 |
+| Returning after gap | 11 | 15.666 | 12.562 | 10.501 |
+| No mid-season swap | 213 | 6.291 | 4.182 | 1.751 |
+| Mid-season swap | 9 | 5.774 | 4.497 | 0.804 |
+| Other test seasons | 200 | 6.348 | 4.177 | 1.690 |
+| 2022 regulation-change season | 22 | 5.519 | 4.355 | 1.916 |
 
 The clearest failure mode is missing history: returning drivers after a gap have
-**12.443 MAE**, while ordinary returning drivers have **3.198 MAE**. Rookies
-also have much larger error (**8.571 MAE**) than established returners. Mid-season
-swaps are slightly worse than non-swaps, but the sample is only seven driver-
+**12.562 MAE**, while ordinary returning drivers have **3.138 MAE**. Rookies
+also have much larger error (**7.362 MAE**) than established returners. Mid-season
+swaps are slightly worse than non-swaps, but the sample is only nine driver-
 seasons, so that result is not conclusive.
 
 ### Worst chronological test seasons
 
 | Test season | Train through | RMSE | MAE | Spearman ρ |
 |---:|---:|---:|---:|---:|
-| 2015 | 2014 | 11.414 | 7.697 | 0.726 |
-| 2016 | 2015 | 10.221 | 5.893 | 0.861 |
-| 2019 | 2018 | 7.957 | 5.683 | 0.744 |
-| 2020 | 2019 | 5.005 | 4.193 | 0.776 |
-| 2022 | 2021 | 5.209 | 4.117 | 0.843 |
+| 2019 | 2018 | 8.125 | 6.036 | 0.744 |
+| 2016 | 2015 | 9.847 | 5.772 | 0.849 |
+| 2022 | 2021 | 5.519 | 4.355 | 0.832 |
+| 2021 | 2020 | 8.050 | 4.195 | 0.874 |
+| 2020 | 2019 | 4.967 | 4.161 | 0.768 |
 
 The 2022 regulation-change case is a useful stress test, but it is not the
 worst season by MAE in this sample. That is the honest conclusion: the model
-shows a positive **1.723** mean signed error in 2022, but the largest failures
+shows a positive **1.916** mean signed error in 2022, but the largest failures
 are concentrated in earlier seasons and in drivers with weak or missing history.
 
 The underlying per-driver errors, season summaries, and group summaries are
@@ -351,23 +351,23 @@ indicate more useful out-of-season information.
 
 | Rank | Feature | Mean RMSE increase | Season SD | Positive seasons |
 |---|---|---:|---:|---:|
-| 1 | prev_season_points_sum | 4.063 | 1.345 | 10/10 |
-| 2 | prev_team_final_position | 2.534 | 1.435 | 10/10 |
-| 3 | prev_team_final_points | 1.259 | 1.438 | 9/10 |
-| 4 | prev_season_races_started | 1.125 | 1.729 | 8/10 |
-| 5 | prev_season_avg_finish_pos | 0.943 | 0.667 | 10/10 |
-| 6 | prev_season_avg_grid_pos | 0.571 | 0.229 | 10/10 |
-| 7 | missing_constructor_history | 0.400 | 0.485 | 8/10 |
-| 8 | prev_season_podium_rate | 0.189 | 0.095 | 10/10 |
-| 9 | returning_after_gap | 0.082 | 0.135 | 7/10 |
-| 10 | prev_season_win_rate | 0.041 | 0.026 | 9/10 |
+| 1 | prev_season_points_sum | 4.272 | 1.144 | 10/10 |
+| 2 | prev_season_races_started | 3.366 | 1.442 | 10/10 |
+| 3 | prev_team_final_position | 2.322 | 1.678 | 10/10 |
+| 4 | prev_team_final_points | 1.378 | 1.367 | 9/10 |
+| 5 | prev_season_avg_finish_pos | 0.738 | 0.574 | 10/10 |
+| 6 | prev_season_avg_grid_pos | 0.663 | 0.317 | 10/10 |
+| 7 | missing_constructor_history | 0.459 | 0.781 | 6/10 |
+| 8 | prev_season_podium_rate | 0.223 | 0.076 | 10/10 |
+| 9 | prev_season_win_rate | 0.053 | 0.030 | 9/10 |
+| 10 | returning_after_gap | 0.038 | 0.079 | 6/10 |
 
 ## Next steps
 
 - Replace the season-opening-constructor approximation with an explicit pre-season entry list, as `MODEL_CARD.md` notes that the historical reconstruction currently takes the first constructor observed in race data.
 - Investigate leakage-safe prior-season aggregates from the qualifying and pit-stop tables that `create_features()` currently loads and discards with `del qualifying, pit_stops`.
-- Add per-season confusion matrices and class-support counts for all six tiers before changing the classifier, because Podium F1 **0.174** and Top 5 F1 **0.207** are close to unusable and do not show whether imbalance or adjacent-tier overlap dominates.
-- Treat rookies and returning-after-gap drivers as a separate cold-start evaluation slice, because missing prior-season values are imputed with zero and those groups have the largest observed MAE (**8.571** and **12.443**).
+- Add per-season confusion matrices and class-support counts for all six tiers before changing the classifier, because Podium F1 **0.183** and Top 5 F1 **0.217** are close to unusable and do not show whether imbalance or adjacent-tier overlap dominates.
+- Treat rookies and returning-after-gap drivers as a separate cold-start evaluation slice, because missing prior-season values are imputed with zero and those groups have the largest observed MAE (**7.362** and **12.562**).
 - Keep the previous-season-order baseline as a model-selection gate for future changes, because it still beats every fitted regressor overall and the Random Forest loses nine of ten seasons on RMSE.
 
 ## Tech Stack

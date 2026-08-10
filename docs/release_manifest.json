@@ -1,7 +1,8 @@
 {
   "prediction_year": 2023,
-  "git_commit": "99d83617dcb444b3369f1f494fbcb5c2bf87ce7c",
-  "generated_at_utc": "2026-07-30T16:41:47.902187+00:00",
+  "git_commit": "8412275fc9591d0f5ce887fcabe1ec9dfcebb1e4",
+  "generated_at_utc": "2026-08-10T06:24:19.891597+00:00",
+  "full_audit": true,
   "python_version": "3.13.12",
   "packages": {
     "numpy": "2.4.6",
@@ -12,145 +13,145 @@
   },
   "data": {
     "source": "https://www.kaggle.com/datasets/jtrotman/formula-1-race-data",
-    "downloaded_at_utc": "unknown",
-    "source_etag": null,
-    "source_last_modified": null,
-    "archive_sha256": "unknown",
+    "downloaded_at_utc": "2026-08-10T06:10:20.331197+00:00",
+    "source_etag": "\"af385bcf9579f31b3b2de58dd8234fde\"",
+    "source_last_modified": "Wed, 29 Jul 2026 12:13:13 GMT",
+    "archive_sha256": "d6901fe474b94ca435a730ab5565cf37aa2d53812f52ceeeda3cec4840f985dd",
     "raw_files": {
       "circuits.csv": {
-        "sha256": "8a2ac67a0946ac238ddeaa4a212a1f3969f0108527b0213e7a38b3a5c3cba6eb",
-        "bytes": 10104
+        "sha256": "a43c986bf3f4b3856682e0f8d14bb2c07fab578ce670421c6b96507c151c9590",
+        "bytes": 10206
       },
       "constructor_results.csv": {
-        "sha256": "8f1ebc0ce822bc02326b9bf13616f22a81514a6d35e5b744fd6f627b9ef99634",
-        "bytes": 219365
+        "sha256": "1879dc951a005d27f14c66efcee5dbd4ae5530ef6a28c3a7405cc9406a5cf0b5",
+        "bytes": 226389
       },
       "constructor_standings.csv": {
-        "sha256": "9f07b1b9f235625165f62c6fcd6b1938cd7daa6f7e4a580f9937c6268056de9b",
-        "bytes": 317206
+        "sha256": "a8b7f60667bf2ff6d0812bb8ee5fd965705a14767d75ca72bade61404f5de16b",
+        "bytes": 298937
       },
       "constructors.csv": {
-        "sha256": "ae423f6f2d6cd74d5cd594eac0bdec7e1e9be2cda3097eb69f870294a225618c",
-        "bytes": 17478
+        "sha256": "a80601ac9f6961221527682452aa99c3075e8bddf5bb12e1eca95052aee52600",
+        "bytes": 17648
       },
       "driver_standings.csv": {
-        "sha256": "58397ed38d29f71316ba272a2ffd5bd00b6174774d919ce079ae4d3cfb27befb",
-        "bytes": 883771
+        "sha256": "bf7e65897307b6eb420a753c73d39e636862e571b9e89caaad0f0234ef86dcc1",
+        "bytes": 832380
       },
       "drivers.csv": {
-        "sha256": "6a894569cb031dd65fb5f113f57b235100966653eaedd9310503dc2e94afae6b",
-        "bytes": 94367
+        "sha256": "d0a061348fc6874762691c0839db0a55102d3b5120d0f0cb39e74cd4635308f8",
+        "bytes": 94840
       },
       "lap_times.csv": {
-        "sha256": "70a772924f67682701acf1a6f26e8225ffd1b9f50844b2f9fb42ce311333cc33",
-        "bytes": 17622395
+        "sha256": "ce69bf7fb6d357ebf80f99c0149ac868adb37596bda460ba78111aa71c2f8c6e",
+        "bytes": 24653420
       },
       "pit_stops.csv": {
-        "sha256": "70cff48b96416d46b8f6f162e778fcee45582b8fa85e9ec4a5e2c7b60bead75c",
-        "bytes": 443719
+        "sha256": "38836b6e7bdc627b1afa1b2d668275d0676fe8bb4c69b13e1c676c8412a431e9",
+        "bytes": 774320
       },
       "qualifying.csv": {
-        "sha256": "49c4ff9ae0be93d5f850f56c553d5e264914c7ba0c4d583462f3de06aebed3cc",
-        "bytes": 465231
+        "sha256": "c9d5e5bfa86ea1c2ead15ff47832a8637e0d418c791d72016741a150a9103c6d",
+        "bytes": 458323
       },
       "races.csv": {
-        "sha256": "4839d035abc603fa88fa08fa976a86d76cff35f3e94cb767d25f735a5a3376ef",
-        "bytes": 164344
+        "sha256": "29dba485d4c385ffc6590f417fe9f28dab8a26c6211e208b0e4cb1b87b927416",
+        "bytes": 173145
       },
       "results.csv": {
-        "sha256": "a2392658044286800a0a946138067d9823f39e59147eeef0cbdda858ff172441",
-        "bytes": 1721961
+        "sha256": "1ab8a8c573ecf2201c95467941184aa5e732cbef4f64c1a272d8aca47382d406",
+        "bytes": 1665752
       },
       "seasons.csv": {
-        "sha256": "9562d2374cced42e24988fb2325cca5c82455815a5f5d40f6a6f5262a36106dc",
-        "bytes": 4594
+        "sha256": "4dbb8bdffe6d8361334993586e55e4380e1f49eda18d0ff4ca71c8e867b0f1a6",
+        "bytes": 4740
       },
       "sprint_results.csv": {
-        "sha256": "4a20b577098bafd2683c4f4ac1bb1cf4b2e8cc6a13c91c16878c7b2b21a24647",
-        "bytes": 24732
+        "sha256": "d2da0bc995f663b25990d1d8086983367d0bb645a64f8625f4e2b0a4dec0b223",
+        "bytes": 37258
       },
       "status.csv": {
-        "sha256": "c36b1287f2421a288c38b0ce875d6ed04ff26bbda3e06db3d99e12197ea894aa",
-        "bytes": 2136
+        "sha256": "6651b8a26b6efd60fde9f7d6a2dd8523c80910918c5e9fe97a9c3136ef5fba2d",
+        "bytes": 2172
       }
     },
-    "rows": 3211,
+    "rows": 3254,
     "season_min": 1950,
-    "season_max": 2024,
-    "season_count": 75
+    "season_max": 2026,
+    "season_count": 77
   },
   "evaluation": [
     {
       "model": "Naive: previous-season final order",
       "test_seasons": 10,
-      "mean_rmse": 3.758,
-      "rmse_sd": 0.747,
+      "mean_rmse": 3.728,
+      "rmse_sd": 0.744,
       "mean_r2": 0.641,
-      "r2_sd": 0.161,
+      "r2_sd": 0.168,
       "mean_spearman": 0.821,
-      "spearman_sd": 0.081,
+      "spearman_sd": 0.084,
       "mean_spearman_delta_vs_naive": 0.0,
       "spearman_delta_vs_naive_sd": 0.0
     },
     {
-      "model": "Random Forest (history only)",
+      "model": "Random Forest + cold-start flags",
       "test_seasons": 10,
-      "mean_rmse": 6.657,
-      "rmse_sd": 2.818,
-      "mean_r2": -0.277,
-      "r2_sd": 1.042,
-      "mean_spearman": 0.808,
-      "spearman_sd": 0.061,
-      "mean_spearman_delta_vs_naive": -0.012,
+      "mean_rmse": 5.982,
+      "rmse_sd": 1.969,
+      "mean_r2": 0.026,
+      "r2_sd": 0.668,
+      "mean_spearman": 0.811,
+      "spearman_sd": 0.045,
+      "mean_spearman_delta_vs_naive": -0.01,
       "spearman_delta_vs_naive_sd": 0.065
     },
     {
-      "model": "Random Forest + cold-start flags",
+      "model": "Random Forest (history only)",
       "test_seasons": 10,
-      "mean_rmse": 6.531,
-      "rmse_sd": 2.704,
-      "mean_r2": -0.217,
-      "r2_sd": 0.998,
+      "mean_rmse": 6.189,
+      "rmse_sd": 2.301,
+      "mean_r2": -0.071,
+      "r2_sd": 0.823,
       "mean_spearman": 0.807,
-      "spearman_sd": 0.051,
-      "mean_spearman_delta_vs_naive": -0.014,
-      "spearman_delta_vs_naive_sd": 0.055
-    },
-    {
-      "model": "Gradient Boosting",
-      "test_seasons": 10,
-      "mean_rmse": 6.938,
-      "rmse_sd": 2.63,
-      "mean_r2": -0.346,
-      "r2_sd": 1.028,
-      "mean_spearman": 0.784,
       "spearman_sd": 0.058,
-      "mean_spearman_delta_vs_naive": -0.036,
-      "spearman_delta_vs_naive_sd": 0.084
+      "mean_spearman_delta_vs_naive": -0.014,
+      "spearman_delta_vs_naive_sd": 0.074
     },
     {
       "model": "Baseline: previous avg finish",
       "test_seasons": 10,
-      "mean_rmse": 4.564,
-      "rmse_sd": 0.875,
-      "mean_r2": 0.462,
-      "r2_sd": 0.273,
-      "mean_spearman": 0.783,
-      "spearman_sd": 0.085,
-      "mean_spearman_delta_vs_naive": -0.038,
-      "spearman_delta_vs_naive_sd": 0.031
+      "mean_rmse": 4.543,
+      "rmse_sd": 0.706,
+      "mean_r2": 0.466,
+      "r2_sd": 0.247,
+      "mean_spearman": 0.788,
+      "spearman_sd": 0.073,
+      "mean_spearman_delta_vs_naive": -0.033,
+      "spearman_delta_vs_naive_sd": 0.025
+    },
+    {
+      "model": "Gradient Boosting",
+      "test_seasons": 10,
+      "mean_rmse": 6.302,
+      "rmse_sd": 2.087,
+      "mean_r2": -0.089,
+      "r2_sd": 0.754,
+      "mean_spearman": 0.757,
+      "spearman_sd": 0.095,
+      "mean_spearman_delta_vs_naive": -0.064,
+      "spearman_delta_vs_naive_sd": 0.113
     },
     {
       "model": "Ridge",
       "test_seasons": 10,
-      "mean_rmse": 9.517,
-      "rmse_sd": 2.178,
-      "mean_r2": -1.359,
-      "r2_sd": 1.235,
-      "mean_spearman": 0.777,
-      "spearman_sd": 0.057,
-      "mean_spearman_delta_vs_naive": -0.043,
-      "spearman_delta_vs_naive_sd": 0.066
+      "mean_rmse": 9.081,
+      "rmse_sd": 1.572,
+      "mean_r2": -1.135,
+      "r2_sd": 1.018,
+      "mean_spearman": 0.734,
+      "spearman_sd": 0.09,
+      "mean_spearman_delta_vs_naive": -0.087,
+      "spearman_delta_vs_naive_sd": 0.061
     }
   ],
   "artifacts": {
