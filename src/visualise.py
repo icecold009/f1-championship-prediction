@@ -1,5 +1,7 @@
 import logging
+
 import matplotlib
+
 matplotlib.use("Agg")
 
 from pathlib import Path
@@ -49,7 +51,11 @@ def create_visualisation(year: int = 2023) -> Path:
     ax.set_yticklabels(df["Driver"], fontsize=9)
     ax.invert_yaxis()
     ax.set_xlabel("Championship Position (lower = better)")
-    ax.set_title(f"{year} F1 Championship — Predicted vs Actual Standings", fontsize=13, fontweight="bold")
+    ax.set_title(
+        f"{year} F1 Championship — Predicted vs Actual Standings",
+        fontsize=13,
+        fontweight="bold",
+    )
     ax.legend()
     ax.xaxis.set_major_locator(ticker.MaxNLocator(integer=True))
 

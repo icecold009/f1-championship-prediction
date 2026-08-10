@@ -1,0 +1,1376 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>F1 Championship Forecast | 2023</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #172033;
+      --muted: #667085;
+      --paper: #f7f8fb;
+      --panel: #ffffff;
+      --red: #e10600;
+      --blue: #1e41ff;
+      --line: #e4e7ec;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 Inter, ui-sans-serif, system-ui, sans-serif; }
+    .shell { max-width: 1180px; margin: 0 auto; padding: 32px 20px 56px; }
+    .hero { background: linear-gradient(135deg, #141b2d, #273354); border-radius: 22px; color: white; padding: 34px; margin-bottom: 20px; }
+    .eyebrow { color: #ffb3ad; font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    h1 { font-size: clamp(30px, 5vw, 54px); line-height: 1; margin: 10px 0 12px; letter-spacing: -.04em; }
+    h2 { margin: 0 0 14px; font-size: 22px; }
+    .hero p { color: #d6dcf0; margin: 0; max-width: 720px; }
+    .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0; }
+    .card, .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 8px 28px rgba(23, 32, 51, .05); }
+    .card { min-height: 116px; padding: 18px; display: flex; flex-direction: column; gap: 5px; }
+    .card-label, .card-detail, .muted { color: var(--muted); }
+    .card-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+    .card strong { font-size: 24px; letter-spacing: -.03em; }
+    .card-detail { font-size: 13px; }
+    .panel { padding: 24px; margin-top: 20px; overflow-x: auto; }
+    .panel > p { color: var(--muted); margin-top: -5px; }
+    .data-table { border-collapse: collapse; width: 100%; min-width: 620px; }
+    .data-table th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; text-align: left; }
+    .data-table th, .data-table td { border-bottom: 1px solid var(--line); padding: 11px 10px; white-space: nowrap; }
+    .data-table tr:first-child td { font-weight: 800; }
+    .data-table tr:hover td { background: #f8faff; }
+    .table-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--muted); font-size: 13px; }
+    .table-controls select { border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; color: var(--ink); background: var(--panel); }
+    img { display: block; max-width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); }
+    code { background: #eef1f7; border-radius: 5px; padding: 2px 5px; }
+    footer { color: var(--muted); font-size: 13px; margin-top: 22px; }
+    @media (max-width: 760px) { .cards { grid-template-columns: repeat(2, 1fr); } .hero { padding: 25px; } .panel { padding: 18px; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div class="eyebrow">F1 Championship Forecast</div>
+      <h1>2023 Drivers' Championship</h1>
+      <p>A transparent view of the generated forecast, actual outcome comparison, and rolling-origin benchmark.</p>
+    </header>
+    <section class="cards"><div class="card"><span class="card-label">Point forecast champion</span><strong>Max Verstappen</strong><span class="card-detail">98% champion bootstrap frequency; 100% top-3 frequency</span></div><div class="card"><span class="card-label">Predicted position</span><strong>2.95</strong><span class="card-detail"></span></div><div class="card"><span class="card-label">Drivers ranked</span><strong>22</strong><span class="card-detail"></span></div><div class="card"><span class="card-label">Spearman vs actual</span><strong>0.815</strong><span class="card-detail"></span></div></section>
+    <section class="panel">
+      <h2>Predicted versus actual</h2>
+      <img src="predicted_vs_actual_2023.png" alt="Predicted versus actual 2023 standings chart">
+    </section>
+    <section class="panel">
+      <h2>Rolling-origin evaluation</h2>
+      <p>Historical benchmark across chronological test seasons. Each test season is held out in full; lower RMSE is better, while higher R² and Spearman are better.</p>
+      <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: left;">
+      <th>model</th>
+      <th>test_seasons</th>
+      <th>mean_rmse</th>
+      <th>rmse_sd</th>
+      <th>mean_r2</th>
+      <th>r2_sd</th>
+      <th>mean_spearman</th>
+      <th>spearman_sd</th>
+      <th>mean_spearman_delta_vs_naive</th>
+      <th>spearman_delta_vs_naive_sd</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Naive: previous-season final order</td>
+      <td>10</td>
+      <td>3.758</td>
+      <td>0.747</td>
+      <td>0.641</td>
+      <td>0.161</td>
+      <td>0.821</td>
+      <td>0.081</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <td>Random Forest (history only)</td>
+      <td>10</td>
+      <td>6.657</td>
+      <td>2.818</td>
+      <td>-0.277</td>
+      <td>1.042</td>
+      <td>0.808</td>
+      <td>0.061</td>
+      <td>-0.012</td>
+      <td>0.065</td>
+    </tr>
+    <tr>
+      <td>Random Forest + cold-start flags</td>
+      <td>10</td>
+      <td>6.531</td>
+      <td>2.704</td>
+      <td>-0.217</td>
+      <td>0.998</td>
+      <td>0.807</td>
+      <td>0.051</td>
+      <td>-0.014</td>
+      <td>0.055</td>
+    </tr>
+    <tr>
+      <td>Gradient Boosting</td>
+      <td>10</td>
+      <td>6.938</td>
+      <td>2.630</td>
+      <td>-0.346</td>
+      <td>1.028</td>
+      <td>0.784</td>
+      <td>0.058</td>
+      <td>-0.036</td>
+      <td>0.084</td>
+    </tr>
+    <tr>
+      <td>Baseline: previous avg finish</td>
+      <td>10</td>
+      <td>4.564</td>
+      <td>0.875</td>
+      <td>0.462</td>
+      <td>0.273</td>
+      <td>0.783</td>
+      <td>0.085</td>
+      <td>-0.038</td>
+      <td>0.031</td>
+    </tr>
+    <tr>
+      <td>Ridge</td>
+      <td>10</td>
+      <td>9.517</td>
+      <td>2.178</td>
+      <td>-1.359</td>
+      <td>1.235</td>
+      <td>0.777</td>
+      <td>0.057</td>
+      <td>-0.043</td>
+      <td>0.066</td>
+    </tr>
+  </tbody>
+</table>
+      <h3>Paired comparison with the naïve baseline</h3>
+      <p>Confidence intervals resample whole test seasons. Win/loss counts compare each method with the baseline on exactly the same seasons.</p>
+      <img src="model_vs_naive_by_season.png" alt="Per-season Spearman difference versus naïve baseline">
+      <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: left;">
+      <th>model</th>
+      <th>test_seasons</th>
+      <th>mean_spearman_delta_vs_naive</th>
+      <th>spearman_delta_ci95_low</th>
+      <th>spearman_delta_ci95_high</th>
+      <th>spearman_wins</th>
+      <th>spearman_ties</th>
+      <th>spearman_losses</th>
+      <th>mean_rmse_delta_vs_naive</th>
+      <th>rmse_delta_ci95_low</th>
+      <th>rmse_delta_ci95_high</th>
+      <th>rmse_wins</th>
+      <th>rmse_ties</th>
+      <th>rmse_losses</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Random Forest (history only)</td>
+      <td>10</td>
+      <td>-0.012</td>
+      <td>-0.051</td>
+      <td>0.026</td>
+      <td>5</td>
+      <td>0</td>
+      <td>5</td>
+      <td>2.898</td>
+      <td>1.371</td>
+      <td>4.577</td>
+      <td>1</td>
+      <td>0</td>
+      <td>9</td>
+    </tr>
+    <tr>
+      <td>Random Forest + cold-start flags</td>
+      <td>10</td>
+      <td>-0.014</td>
+      <td>-0.045</td>
+      <td>0.019</td>
+      <td>4</td>
+      <td>0</td>
+      <td>6</td>
+      <td>2.773</td>
+      <td>1.330</td>
+      <td>4.393</td>
+      <td>1</td>
+      <td>0</td>
+      <td>9</td>
+    </tr>
+    <tr>
+      <td>Gradient Boosting</td>
+      <td>10</td>
+      <td>-0.036</td>
+      <td>-0.086</td>
+      <td>0.013</td>
+      <td>4</td>
+      <td>0</td>
+      <td>6</td>
+      <td>3.179</td>
+      <td>1.775</td>
+      <td>4.744</td>
+      <td>0</td>
+      <td>0</td>
+      <td>10</td>
+    </tr>
+    <tr>
+      <td>Baseline: previous avg finish</td>
+      <td>10</td>
+      <td>-0.038</td>
+      <td>-0.056</td>
+      <td>-0.020</td>
+      <td>1</td>
+      <td>0</td>
+      <td>9</td>
+      <td>0.806</td>
+      <td>0.542</td>
+      <td>1.067</td>
+      <td>0</td>
+      <td>0</td>
+      <td>10</td>
+    </tr>
+    <tr>
+      <td>Ridge</td>
+      <td>10</td>
+      <td>-0.043</td>
+      <td>-0.083</td>
+      <td>-0.006</td>
+      <td>3</td>
+      <td>1</td>
+      <td>6</td>
+      <td>5.759</td>
+      <td>4.650</td>
+      <td>6.935</td>
+      <td>0</td>
+      <td>0</td>
+      <td>10</td>
+    </tr>
+  </tbody>
+</table>
+    </section>
+    <section class="panel">
+      <h2>Tier classification</h2>
+      <p>Random Forest tier metrics averaged across the same chronological test seasons. Accuracy is the fraction of correctly classified drivers; macro F1 gives each tier equal weight.</p>
+      <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: left;">
+      <th>model</th>
+      <th>test_seasons</th>
+      <th>mean_accuracy</th>
+      <th>accuracy_sd</th>
+      <th>mean_macro_f1</th>
+      <th>macro_f1_sd</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Random Forest</td>
+      <td>10</td>
+      <td>0.509</td>
+      <td>0.072</td>
+      <td>0.441</td>
+      <td>0.073</td>
+    </tr>
+  </tbody>
+</table><table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: left;">
+      <th>tier</th>
+      <th>test_seasons</th>
+      <th>mean_f1</th>
+      <th>f1_sd</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Champion</td>
+      <td>10</td>
+      <td>0.800</td>
+      <td>0.322</td>
+    </tr>
+    <tr>
+      <td>Podium</td>
+      <td>10</td>
+      <td>0.174</td>
+      <td>0.283</td>
+    </tr>
+    <tr>
+      <td>Top 5</td>
+      <td>10</td>
+      <td>0.207</td>
+      <td>0.274</td>
+    </tr>
+    <tr>
+      <td>Top 10</td>
+      <td>10</td>
+      <td>0.511</td>
+      <td>0.143</td>
+    </tr>
+    <tr>
+      <td>Midfield</td>
+      <td>10</td>
+      <td>0.271</td>
+      <td>0.193</td>
+    </tr>
+    <tr>
+      <td>Backmarker</td>
+      <td>10</td>
+      <td>0.681</td>
+      <td>0.120</td>
+    </tr>
+  </tbody>
+</table>
+    </section>
+    <section class="panel">
+      <h2>Where this model breaks</h2>
+      <p>Error analysis uses the same walk-forward Random Forest predictions. Rookie/gap-returning labels and mid-season swaps are post-hoc diagnostic categories, not model inputs; 2022 is isolated as a predeclared regulation-change case study.</p>
+      <h3>Worst test seasons by MAE</h3><table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: left;">
+      <th>test_year</th>
+      <th>train_end_year</th>
+      <th>observations</th>
+      <th>rmse</th>
+      <th>mae</th>
+      <th>median_absolute_error</th>
+      <th>mean_signed_error</th>
+      <th>spearman</th>
+      <th>rookie_mae</th>
+      <th>returning_mae</th>
+      <th>swap_mae</th>
+      <th>regulation_change_year</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>2015</td>
+      <td>2014</td>
+      <td>22</td>
+      <td>11.414</td>
+      <td>7.697</td>
+      <td>4.504</td>
+      <td>4.802</td>
+      <td>0.726</td>
+      <td>15.783</td>
+      <td>5.318</td>
+      <td>NaN</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>2016</td>
+      <td>2015</td>
+      <td>24</td>
+      <td>10.221</td>
+      <td>5.893</td>
+      <td>3.256</td>
+      <td>3.796</td>
+      <td>0.861</td>
+      <td>8.286</td>
+      <td>4.295</td>
+      <td>5.165</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>2019</td>
+      <td>2018</td>
+      <td>20</td>
+      <td>7.957</td>
+      <td>5.683</td>
+      <td>3.903</td>
+      <td>3.627</td>
+      <td>0.744</td>
+      <td>9.625</td>
+      <td>3.467</td>
+      <td>7.487</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>2020</td>
+      <td>2019</td>
+      <td>23</td>
+      <td>5.005</td>
+      <td>4.193</td>
+      <td>3.534</td>
+      <td>0.553</td>
+      <td>0.776</td>
+      <td>7.092</td>
+      <td>3.530</td>
+      <td>0.406</td>
+      <td>False</td>
+    </tr>
+    <tr>
+      <td>2022</td>
+      <td>2021</td>
+      <td>22</td>
+      <td>5.209</td>
+      <td>4.117</td>
+      <td>3.585</td>
+      <td>1.723</td>
+      <td>0.843</td>
+      <td>9.040</td>
+      <td>2.696</td>
+      <td>NaN</td>
+      <td>True</td>
+    </tr>
+  </tbody>
+</table><h3>Error by driver/season type</h3><table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: left;">
+      <th>dimension</th>
+      <th>group</th>
+      <th>observations</th>
+      <th>seasons</th>
+      <th>rmse</th>
+      <th>mae</th>
+      <th>median_absolute_error</th>
+      <th>mean_signed_error</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Driver type</td>
+      <td>Returning after gap</td>
+      <td>11</td>
+      <td>6</td>
+      <td>15.851</td>
+      <td>12.443</td>
+      <td>8.269</td>
+      <td>10.480</td>
+    </tr>
+    <tr>
+      <td>Driver type</td>
+      <td>Rookie</td>
+      <td>33</td>
+      <td>10</td>
+      <td>11.264</td>
+      <td>8.571</td>
+      <td>7.058</td>
+      <td>5.506</td>
+    </tr>
+    <tr>
+      <td>Constructor changes</td>
+      <td>Mid-season swap</td>
+      <td>7</td>
+      <td>5</td>
+      <td>6.478</td>
+      <td>5.416</td>
+      <td>4.546</td>
+      <td>1.607</td>
+    </tr>
+    <tr>
+      <td>Regulation context</td>
+      <td>Other test seasons</td>
+      <td>201</td>
+      <td>9</td>
+      <td>7.172</td>
+      <td>4.486</td>
+      <td>2.851</td>
+      <td>1.839</td>
+    </tr>
+    <tr>
+      <td>Constructor changes</td>
+      <td>No mid-season swap</td>
+      <td>216</td>
+      <td>10</td>
+      <td>7.019</td>
+      <td>4.418</td>
+      <td>2.835</td>
+      <td>1.835</td>
+    </tr>
+    <tr>
+      <td>Regulation context</td>
+      <td>2022 regulation-change season</td>
+      <td>22</td>
+      <td>1</td>
+      <td>5.209</td>
+      <td>4.117</td>
+      <td>3.585</td>
+      <td>1.723</td>
+    </tr>
+    <tr>
+      <td>Driver type</td>
+      <td>Returning</td>
+      <td>179</td>
+      <td>10</td>
+      <td>4.718</td>
+      <td>3.198</td>
+      <td>2.592</td>
+      <td>0.618</td>
+    </tr>
+  </tbody>
+</table>
+    </section>
+    <section class="panel">
+      <h2>Bootstrap uncertainty</h2>
+      <p>Each row reports the distribution from 100 season-level bootstrap Random Forest fits. Frequencies are the fraction of bootstrap rankings placing a driver champion, in the top 3, or in the top 5. P05–P95 describes model sensitivity, not a calibrated 90% prediction interval; historical coverage is reported below.</p>
+      <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: left;">
+      <th>Predicted Rank</th>
+      <th>Driver</th>
+      <th>Predicted Position</th>
+      <th>Bootstrap Position SD</th>
+      <th>Bootstrap Position P05</th>
+      <th>Bootstrap Position P95</th>
+      <th>Champion Probability</th>
+      <th>Top 3 Probability</th>
+      <th>Top 5 Probability</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td>Max Verstappen</td>
+      <td>2.95</td>
+      <td>0.5704</td>
+      <td>1.8768</td>
+      <td>3.7483</td>
+      <td>98%</td>
+      <td>100%</td>
+      <td>100%</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>Carlos Sainz</td>
+      <td>5.05</td>
+      <td>1.0863</td>
+      <td>3.9211</td>
+      <td>7.1572</td>
+      <td>0%</td>
+      <td>45%</td>
+      <td>77%</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>Charles Leclerc</td>
+      <td>5.16</td>
+      <td>1.0023</td>
+      <td>3.5576</td>
+      <td>7.0043</td>
+      <td>2%</td>
+      <td>63%</td>
+      <td>89%</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>Sergio Pérez</td>
+      <td>5.27</td>
+      <td>0.7664</td>
+      <td>3.9066</td>
+      <td>6.3224</td>
+      <td>0%</td>
+      <td>64%</td>
+      <td>96%</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>George Russell</td>
+      <td>5.34</td>
+      <td>0.7858</td>
+      <td>4.7306</td>
+      <td>7.1629</td>
+      <td>0%</td>
+      <td>15%</td>
+      <td>67%</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>Lewis Hamilton</td>
+      <td>5.59</td>
+      <td>0.6720</td>
+      <td>4.8683</td>
+      <td>6.9900</td>
+      <td>0%</td>
+      <td>8%</td>
+      <td>65%</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>Esteban Ocon</td>
+      <td>9.47</td>
+      <td>0.8192</td>
+      <td>8.2314</td>
+      <td>10.6482</td>
+      <td>0%</td>
+      <td>0%</td>
+      <td>0%</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>Fernando Alonso</td>
+      <td>9.89</td>
+      <td>1.0082</td>
+      <td>8.8490</td>
+      <td>12.0061</td>
+      <td>0%</td>
+      <td>0%</td>
+      <td>0%</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>Lando Norris</td>
+      <td>10.35</td>
+      <td>1.3498</td>
+      <td>7.9069</td>
+      <td>11.8570</td>
+      <td>0%</td>
+      <td>0%</td>
+      <td>0%</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>Oscar Piastri</td>
+      <td>11.17</td>
+      <td>3.0636</td>
+      <td>5.6407</td>
+      <td>15.2216</td>
+      <td>0%</td>
+      <td>5%</td>
+      <td>6%</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td>Valtteri Bottas</td>
+      <td>11.72</td>
+      <td>1.0784</td>
+      <td>10.1183</td>
+      <td>13.5420</td>
+      <td>0%</td>
+      <td>0%</td>
+      <td>0%</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>Pierre Gasly</td>
+      <td>11.79</td>
+      <td>1.3402</td>
+      <td>8.8840</td>
+      <td>13.4411</td>
+      <td>0%</td>
+      <td>0%</td>
+      <td>0%</td>
+    </tr>
+    <tr>
+      <td>13</td>
+      <td>Nyck de Vries</td>
+      <td>12.79</td>
+      <td>2.5112</td>
+      <td>12.2116</td>
+      <td>19.9446</td>
+      <td>0%</td>
+      <td>0%</td>
+      <td>0%</td>
+    </tr>
+    <tr>
+      <td>14</td>
+      <td>Lance Stroll</td>
+      <td>13.24</td>
+      <td>0.7648</td>
+      <td>11.8929</td>
+      <td>14.3192</td>
+      <td>0%</td>
+      <td>0%</td>
+      <td>0%</td>
+    </tr>
+    <tr>
+      <td>15</td>
+      <td>Daniel Ricciardo</td>
+      <td>13.29</td>
+      <td>1.0423</td>
+      <td>11.4063</td>
+      <td>14.5898</td>
+      <td>0%</td>
+      <td>0%</td>
+      <td>0%</td>
+    </tr>
+    <tr>
+      <td>16</td>
+      <td>Liam Lawson</td>
+      <td>14.32</td>
+      <td>3.7220</td>
+      <td>10.6029</td>
+      <td>22.9272</td>
+      <td>0%</td>
+      <td>0%</td>
+      <td>0%</td>
+    </tr>
+    <tr>
+      <td>17</td>
+      <td>Guanyu Zhou</td>
+      <td>14.40</td>
+      <td>1.0191</td>
+      <td>13.0168</td>
+      <td>16.2670</td>
+      <td>0%</td>
+      <td>0%</td>
+      <td>0%</td>
+    </tr>
+    <tr>
+      <td>18</td>
+      <td>Yuki Tsunoda</td>
+      <td>14.95</td>
+      <td>1.5292</td>
+      <td>12.0480</td>
+      <td>16.8334</td>
+      <td>0%</td>
+      <td>0%</td>
+      <td>0%</td>
+    </tr>
+    <tr>
+      <td>19</td>
+      <td>Kevin Magnussen</td>
+      <td>15.48</td>
+      <td>1.2149</td>
+      <td>13.1064</td>
+      <td>17.2467</td>
+      <td>0%</td>
+      <td>0%</td>
+      <td>0%</td>
+    </tr>
+    <tr>
+      <td>20</td>
+      <td>Alexander Albon</td>
+      <td>15.52</td>
+      <td>0.8472</td>
+      <td>14.4989</td>
+      <td>16.9478</td>
+      <td>0%</td>
+      <td>0%</td>
+      <td>0%</td>
+    </tr>
+    <tr>
+      <td>21</td>
+      <td>Nico Hülkenberg</td>
+      <td>18.10</td>
+      <td>2.1498</td>
+      <td>15.9569</td>
+      <td>22.4623</td>
+      <td>0%</td>
+      <td>0%</td>
+      <td>0%</td>
+    </tr>
+    <tr>
+      <td>22</td>
+      <td>Logan Sargeant</td>
+      <td>28.06</td>
+      <td>2.5366</td>
+      <td>24.5130</td>
+      <td>33.0337</td>
+      <td>0%</td>
+      <td>0%</td>
+      <td>0%</td>
+    </tr>
+  </tbody>
+</table>
+    </section>
+    <section class="panel">
+      <h2>Uncertainty calibration</h2>
+      <p>Historical coverage is measured only on untouched future seasons. Rolling conformal intervals use residuals available before each test season; Brier scores assess probability quality.</p>
+      <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: left;">
+      <th>test_seasons</th>
+      <th>observations</th>
+      <th>nominal_coverage</th>
+      <th>bootstrap_runs</th>
+      <th>trees_per_bootstrap_model</th>
+      <th>point_model_trees</th>
+      <th>bootstrap_interval_coverage</th>
+      <th>bootstrap_mean_width</th>
+      <th>conformal_interval_coverage</th>
+      <th>conformal_mean_width</th>
+      <th>top_3_brier_score</th>
+      <th>champion_brier_score</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>10</td>
+      <td>223</td>
+      <td>0.9</td>
+      <td>100</td>
+      <td>50</td>
+      <td>200</td>
+      <td>0.323</td>
+      <td>4.92</td>
+      <td>0.964</td>
+      <td>19.68</td>
+      <td>0.068</td>
+      <td>0.019</td>
+    </tr>
+  </tbody>
+</table><h3>Top-three probability calibration</h3><table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: left;">
+      <th>probability_bin</th>
+      <th>observations</th>
+      <th>mean_predicted_probability</th>
+      <th>observed_top_3_rate</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0–20%</td>
+      <td>187</td>
+      <td>0.009</td>
+      <td>0.037</td>
+    </tr>
+    <tr>
+      <td>20–40%</td>
+      <td>4</td>
+      <td>0.305</td>
+      <td>0.500</td>
+    </tr>
+    <tr>
+      <td>40–60%</td>
+      <td>4</td>
+      <td>0.472</td>
+      <td>0.500</td>
+    </tr>
+    <tr>
+      <td>60–80%</td>
+      <td>6</td>
+      <td>0.692</td>
+      <td>0.333</td>
+    </tr>
+    <tr>
+      <td>80–100%</td>
+      <td>22</td>
+      <td>0.954</td>
+      <td>0.773</td>
+    </tr>
+  </tbody>
+</table>
+    </section>
+    <section class="panel">
+      <h2>Held-out permutation importance</h2>
+      <p>Importance is the increase in RMSE after permuting one feature in each held-out season. This replaces training-set impurity importance with an out-of-season measurement.</p>
+      <table class="dataframe data-table">
+  <thead>
+    <tr style="text-align: left;">
+      <th>feature</th>
+      <th>test_seasons</th>
+      <th>mean_rmse_increase</th>
+      <th>season_sd</th>
+      <th>positive_seasons</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>prev_season_points_sum</td>
+      <td>10</td>
+      <td>4.063</td>
+      <td>1.345</td>
+      <td>10</td>
+    </tr>
+    <tr>
+      <td>prev_team_final_position</td>
+      <td>10</td>
+      <td>2.534</td>
+      <td>1.435</td>
+      <td>10</td>
+    </tr>
+    <tr>
+      <td>prev_team_final_points</td>
+      <td>10</td>
+      <td>1.259</td>
+      <td>1.438</td>
+      <td>9</td>
+    </tr>
+    <tr>
+      <td>prev_season_races_started</td>
+      <td>10</td>
+      <td>1.125</td>
+      <td>1.729</td>
+      <td>8</td>
+    </tr>
+    <tr>
+      <td>prev_season_avg_finish_pos</td>
+      <td>10</td>
+      <td>0.943</td>
+      <td>0.667</td>
+      <td>10</td>
+    </tr>
+    <tr>
+      <td>prev_season_avg_grid_pos</td>
+      <td>10</td>
+      <td>0.571</td>
+      <td>0.229</td>
+      <td>10</td>
+    </tr>
+    <tr>
+      <td>missing_constructor_history</td>
+      <td>10</td>
+      <td>0.400</td>
+      <td>0.485</td>
+      <td>8</td>
+    </tr>
+    <tr>
+      <td>prev_season_podium_rate</td>
+      <td>10</td>
+      <td>0.189</td>
+      <td>0.095</td>
+      <td>10</td>
+    </tr>
+    <tr>
+      <td>returning_after_gap</td>
+      <td>10</td>
+      <td>0.082</td>
+      <td>0.135</td>
+      <td>5</td>
+    </tr>
+    <tr>
+      <td>prev_season_win_rate</td>
+      <td>10</td>
+      <td>0.041</td>
+      <td>0.026</td>
+      <td>9</td>
+    </tr>
+  </tbody>
+</table>
+    </section>
+    <section class="panel">
+      <h2>Predicted order</h2>
+      <div class="table-controls">
+        <label for="prediction-sort">Sort rows by</label>
+        <select id="prediction-sort">
+          <option value="0">Predicted Rank</option>
+          <option value="12">Champion Probability (highest first)</option>
+          <option value="9">Bootstrap Position SD (lowest first)</option>
+        </select>
+      </div>
+      <table class="dataframe data-table" id="prediction-table">
+  <thead>
+    <tr style="text-align: left;">
+      <th>Predicted Rank</th>
+      <th>Driver</th>
+      <th>Team</th>
+      <th>Predicted Tier</th>
+      <th>Predicted Position</th>
+      <th>Actual Position</th>
+      <th>Actual Points</th>
+      <th>Bootstrap Runs</th>
+      <th>Bootstrap Position Mean</th>
+      <th>Bootstrap Position SD</th>
+      <th>Bootstrap Position P05</th>
+      <th>Bootstrap Position P95</th>
+      <th>Champion Probability</th>
+      <th>Top 3 Probability</th>
+      <th>Top 5 Probability</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td>Max Verstappen</td>
+      <td>Red Bull</td>
+      <td>Champion</td>
+      <td>2.95</td>
+      <td>1.0</td>
+      <td>575.0</td>
+      <td>100</td>
+      <td>2.8054</td>
+      <td>0.5704</td>
+      <td>1.8768</td>
+      <td>3.7483</td>
+      <td>0.98</td>
+      <td>1.00</td>
+      <td>1.00</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>Carlos Sainz</td>
+      <td>Ferrari</td>
+      <td>Podium</td>
+      <td>5.05</td>
+      <td>7.0</td>
+      <td>200.0</td>
+      <td>100</td>
+      <td>5.3699</td>
+      <td>1.0863</td>
+      <td>3.9211</td>
+      <td>7.1572</td>
+      <td>0.00</td>
+      <td>0.45</td>
+      <td>0.77</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>Charles Leclerc</td>
+      <td>Ferrari</td>
+      <td>Podium</td>
+      <td>5.16</td>
+      <td>5.0</td>
+      <td>206.0</td>
+      <td>100</td>
+      <td>4.9992</td>
+      <td>1.0023</td>
+      <td>3.5576</td>
+      <td>7.0043</td>
+      <td>0.02</td>
+      <td>0.63</td>
+      <td>0.89</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>Sergio Pérez</td>
+      <td>Red Bull</td>
+      <td>Podium</td>
+      <td>5.27</td>
+      <td>2.0</td>
+      <td>285.0</td>
+      <td>100</td>
+      <td>5.0493</td>
+      <td>0.7664</td>
+      <td>3.9066</td>
+      <td>6.3224</td>
+      <td>0.00</td>
+      <td>0.64</td>
+      <td>0.96</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>George Russell</td>
+      <td>Mercedes</td>
+      <td>Podium</td>
+      <td>5.34</td>
+      <td>8.0</td>
+      <td>175.0</td>
+      <td>100</td>
+      <td>5.7505</td>
+      <td>0.7858</td>
+      <td>4.7306</td>
+      <td>7.1629</td>
+      <td>0.00</td>
+      <td>0.15</td>
+      <td>0.67</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>Lewis Hamilton</td>
+      <td>Mercedes</td>
+      <td>Podium</td>
+      <td>5.59</td>
+      <td>3.0</td>
+      <td>234.0</td>
+      <td>100</td>
+      <td>5.8173</td>
+      <td>0.6720</td>
+      <td>4.8683</td>
+      <td>6.9900</td>
+      <td>0.00</td>
+      <td>0.08</td>
+      <td>0.65</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>Esteban Ocon</td>
+      <td>Alpine F1 Team</td>
+      <td>Top 10</td>
+      <td>9.47</td>
+      <td>12.0</td>
+      <td>58.0</td>
+      <td>100</td>
+      <td>9.3908</td>
+      <td>0.8192</td>
+      <td>8.2314</td>
+      <td>10.6482</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td>Fernando Alonso</td>
+      <td>Aston Martin</td>
+      <td>Top 10</td>
+      <td>9.89</td>
+      <td>4.0</td>
+      <td>206.0</td>
+      <td>100</td>
+      <td>10.2441</td>
+      <td>1.0082</td>
+      <td>8.8490</td>
+      <td>12.0061</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td>Lando Norris</td>
+      <td>McLaren</td>
+      <td>Top 10</td>
+      <td>10.35</td>
+      <td>6.0</td>
+      <td>205.0</td>
+      <td>100</td>
+      <td>9.8435</td>
+      <td>1.3498</td>
+      <td>7.9069</td>
+      <td>11.8570</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td>Oscar Piastri</td>
+      <td>McLaren</td>
+      <td>Midfield</td>
+      <td>11.17</td>
+      <td>9.0</td>
+      <td>97.0</td>
+      <td>100</td>
+      <td>11.2071</td>
+      <td>3.0636</td>
+      <td>5.6407</td>
+      <td>15.2216</td>
+      <td>0.00</td>
+      <td>0.05</td>
+      <td>0.06</td>
+    </tr>
+    <tr>
+      <td>11</td>
+      <td>Valtteri Bottas</td>
+      <td>Alfa Romeo</td>
+      <td>Top 10</td>
+      <td>11.72</td>
+      <td>15.0</td>
+      <td>10.0</td>
+      <td>100</td>
+      <td>11.7942</td>
+      <td>1.0784</td>
+      <td>10.1183</td>
+      <td>13.5420</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>12</td>
+      <td>Pierre Gasly</td>
+      <td>Alpine F1 Team</td>
+      <td>Top 10</td>
+      <td>11.79</td>
+      <td>11.0</td>
+      <td>62.0</td>
+      <td>100</td>
+      <td>11.1674</td>
+      <td>1.3402</td>
+      <td>8.8840</td>
+      <td>13.4411</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>13</td>
+      <td>Nyck de Vries</td>
+      <td>AlphaTauri</td>
+      <td>Backmarker</td>
+      <td>12.79</td>
+      <td>22.0</td>
+      <td>0.0</td>
+      <td>100</td>
+      <td>15.5080</td>
+      <td>2.5112</td>
+      <td>12.2116</td>
+      <td>19.9446</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>14</td>
+      <td>Lance Stroll</td>
+      <td>Aston Martin</td>
+      <td>Midfield</td>
+      <td>13.24</td>
+      <td>10.0</td>
+      <td>74.0</td>
+      <td>100</td>
+      <td>13.0737</td>
+      <td>0.7648</td>
+      <td>11.8929</td>
+      <td>14.3192</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>15</td>
+      <td>Daniel Ricciardo</td>
+      <td>AlphaTauri</td>
+      <td>Midfield</td>
+      <td>13.29</td>
+      <td>17.0</td>
+      <td>6.0</td>
+      <td>100</td>
+      <td>13.0505</td>
+      <td>1.0423</td>
+      <td>11.4063</td>
+      <td>14.5898</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>16</td>
+      <td>Liam Lawson</td>
+      <td>AlphaTauri</td>
+      <td>Backmarker</td>
+      <td>14.32</td>
+      <td>20.0</td>
+      <td>2.0</td>
+      <td>100</td>
+      <td>16.5532</td>
+      <td>3.7220</td>
+      <td>10.6029</td>
+      <td>22.9272</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>17</td>
+      <td>Guanyu Zhou</td>
+      <td>Alfa Romeo</td>
+      <td>Backmarker</td>
+      <td>14.40</td>
+      <td>18.0</td>
+      <td>6.0</td>
+      <td>100</td>
+      <td>14.6768</td>
+      <td>1.0191</td>
+      <td>13.0168</td>
+      <td>16.2670</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>18</td>
+      <td>Yuki Tsunoda</td>
+      <td>AlphaTauri</td>
+      <td>Backmarker</td>
+      <td>14.95</td>
+      <td>14.0</td>
+      <td>17.0</td>
+      <td>100</td>
+      <td>14.7889</td>
+      <td>1.5292</td>
+      <td>12.0480</td>
+      <td>16.8334</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>19</td>
+      <td>Kevin Magnussen</td>
+      <td>Haas F1 Team</td>
+      <td>Midfield</td>
+      <td>15.48</td>
+      <td>19.0</td>
+      <td>3.0</td>
+      <td>100</td>
+      <td>15.3187</td>
+      <td>1.2149</td>
+      <td>13.1064</td>
+      <td>17.2467</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>20</td>
+      <td>Alexander Albon</td>
+      <td>Williams</td>
+      <td>Backmarker</td>
+      <td>15.52</td>
+      <td>13.0</td>
+      <td>27.0</td>
+      <td>100</td>
+      <td>15.7980</td>
+      <td>0.8472</td>
+      <td>14.4989</td>
+      <td>16.9478</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>21</td>
+      <td>Nico Hülkenberg</td>
+      <td>Haas F1 Team</td>
+      <td>Backmarker</td>
+      <td>18.10</td>
+      <td>16.0</td>
+      <td>9.0</td>
+      <td>100</td>
+      <td>19.0812</td>
+      <td>2.1498</td>
+      <td>15.9569</td>
+      <td>22.4623</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+    </tr>
+    <tr>
+      <td>22</td>
+      <td>Logan Sargeant</td>
+      <td>Williams</td>
+      <td>Backmarker</td>
+      <td>28.06</td>
+      <td>21.0</td>
+      <td>1.0</td>
+      <td>100</td>
+      <td>28.5904</td>
+      <td>2.5366</td>
+      <td>24.5130</td>
+      <td>33.0337</td>
+      <td>0.00</td>
+      <td>0.00</td>
+      <td>0.00</td>
+    </tr>
+  </tbody>
+</table>
+      <script>
+(() => {
+  const select = document.getElementById("prediction-sort");
+  const table = document.getElementById("prediction-table");
+  if (!select || !table || !table.tBodies.length) return;
+
+  const body = table.tBodies[0];
+  const rows = Array.from(body.rows);
+  const sortRows = () => {
+    const column = Number(select.value);
+    const descending = column === 12;
+    rows.sort((left, right) => {
+      const leftValue = Number.parseFloat(left.cells[column].textContent.trim());
+      const rightValue = Number.parseFloat(right.cells[column].textContent.trim());
+      if (Number.isNaN(leftValue) && Number.isNaN(rightValue)) return 0;
+      if (Number.isNaN(leftValue)) return 1;
+      if (Number.isNaN(rightValue)) return -1;
+      return (leftValue - rightValue) * (descending ? -1 : 1);
+    });
+    rows.forEach((row) => body.appendChild(row));
+  };
+
+  select.addEventListener("change", sortRows);
+})();
+</script>
+    </section>
+    <footer>Generated locally from the pinned project pipeline. See MODEL_CARD.md for intended use and limitations.</footer>
+  </main>
+</body>
+</html>

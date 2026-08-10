@@ -1,0 +1,52 @@
+[project]
+name = "f1-championship-prediction"
+version = "1.0.0"
+description = "Leakage-safe Formula 1 championship forecasting and model auditing"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [{ name = "Shaurya Saria" }]
+dependencies = [
+    "pandas==3.0.3",
+    "numpy==2.4.6",
+    "scikit-learn==1.9.0",
+    "matplotlib==3.11.0",
+    "seaborn==0.13.2",
+    "scipy==1.18.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "pytest-cov==6.2.1",
+    "ruff==0.12.7",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.coverage.run]
+branch = true
+source = ["src", "scripts"]
+omit = [
+    "*/__init__.py",
+    "scripts/build_release.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 65
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/*.py" = ["E402"]

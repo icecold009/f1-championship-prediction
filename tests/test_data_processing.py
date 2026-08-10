@@ -67,6 +67,9 @@ def test_create_features_uses_prior_season_only(tmp_path, monkeypatch):
     assert set(current["champ_position"]) == {1, 2}
     assert current["prev_season_points_sum"].tolist() == [50.0, 36.0]
     assert current["prev_team_final_position"].tolist() == [1, 2]
+    assert current["is_rookie"].tolist() == [0, 0]
+    assert current["missing_driver_history"].tolist() == [0, 0]
+    assert current["missing_constructor_history"].tolist() == [0, 0]
     assert "points_sum" not in features.columns
     assert "team_final_position" not in features.columns
     assert (tmp_path / "features.csv").exists()
