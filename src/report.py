@@ -21,7 +21,11 @@ def _card(label: str, value: str, detail: str = "") -> str:
     )
 
 
-def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
+def create_report(
+    year: int = 2023,
+    output_path: Path | None = None,
+    include_audit: bool | None = None,
+) -> Path:
     """Create a self-contained HTML report for a generated season prediction."""
     predictions_path = RESULTS_DIR / f"{year}_predictions.csv"
     if not predictions_path.exists():
@@ -31,6 +35,10 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
 
     output_path = output_path or RESULTS_DIR / f"f1_prediction_report_{year}.html"
     predictions = pd.read_csv(predictions_path)
+    if include_audit is None:
+        include_audit = (
+            RESULTS_DIR / "uncertainty_calibration_summary.csv"
+        ).exists() and (RESULTS_DIR / "permutation_importance_summary.csv").exists()
     valid_actual = predictions.dropna(subset=["Actual Position"])
     if len(valid_actual) > 3:
         correlation = spearmanr(
@@ -121,7 +129,11 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
 
     calibration_summary_path = RESULTS_DIR / "uncertainty_calibration_summary.csv"
     calibration_bins_path = RESULTS_DIR / "uncertainty_calibration_bins.csv"
-    if calibration_summary_path.exists() and calibration_bins_path.exists():
+    if (
+        include_audit
+        and calibration_summary_path.exists()
+        and calibration_bins_path.exists()
+    ):
         calibration_markup = (
             pd.read_csv(calibration_summary_path).to_html(
                 index=False, classes="data-table", border=0, justify="left"
@@ -138,7 +150,7 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
         )
 
     importance_path = RESULTS_DIR / "permutation_importance_summary.csv"
-    if importance_path.exists():
+    if include_audit and importance_path.exists():
         importance_markup = (
             pd.read_csv(importance_path)
             .head(10)

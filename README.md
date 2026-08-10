@@ -31,7 +31,7 @@ error analysis, and held-out permutation importance.
 This project focuses on:
 
 - Collecting and cleaning **historical F1 data** (drivers, constructors, races, results)
-- Engineering features that represent prior-season driver performance, constructor strength, qualifying pace, and reliability
+- Engineering features that represent prior-season driver performance, constructor strength, grid/race pace, and reliability
 - Training machine learning models to:
   - Predict **final championship position**
   - Predict **final position / tier** (e.g. champion, podium contender, midfield, backmarker)
@@ -67,9 +67,12 @@ and result files are regenerated locally and ignored by Git. The evaluation comm
 and per-season detail CSVs under `results/`. See [MODEL_CARD.md](MODEL_CARD.md) for intended use,
 limitations, and the evaluation protocol.
 
-For a validated release bundle with provenance metadata, run
-`python scripts/build_release.py --download --year 2023`. See [RELEASE.md](RELEASE.md) for the
-local checklist and the manual GitHub Actions artifact workflow.
+For a quick local release bundle, run
+`python scripts/build_release.py --download --year 2023` and validate it with
+`python scripts/check_release.py --quick --year 2023`. For a validated bundle
+including the historical calibration and interpretation audit, add
+`--full-audit` and omit `--quick`. See [RELEASE.md](RELEASE.md) for the local
+checklist and the manual GitHub Actions artifact workflow.
 
 ## Tests
 
@@ -113,7 +116,7 @@ The dataset includes (per season and per driver):
   - Finishing position  
   - Points scored  
   - Grid position  
-  - DNFs / DNS  
+  - DNFs, lapped finishes, and DNS
 - Historical season-level aggregates:
   - Total races started  
   - Average finish position  
@@ -121,14 +124,18 @@ The dataset includes (per season and per driver):
   - Points per race  
   - Podiums, wins, poles, fastest laps  
 
-The raw CSVs are downloaded from the public [Formula 1 Race Data Kaggle dataset](https://www.kaggle.com/datasets/jtrotman/formula-1-race-data), which uses the Ergast-compatible table layout expected by this project. The local snapshot used for the reported results has a project-recorded pull date of **2025-01-29** and contains seasons through **2024**. `data/raw/data_manifest.json` stores the SHA-256 digest and byte size of every input table; `results/release_manifest.json` carries those identifiers into every validated build. If the original archive metadata is unavailable, the manifest says so instead of inventing provenance.
+The raw CSVs are downloaded from the public [Formula 1 Race Data Kaggle dataset](https://www.kaggle.com/datasets/jtrotman/formula-1-race-data), which uses the Ergast-compatible table layout expected by this project. The current snapshot's pull time, archive SHA-256, table hashes, and byte sizes are recorded in `data/raw/data_manifest.json`; `results/release_manifest.json` carries those identifiers into every validated build. The downloader also rejects materially truncated tables before replacing the existing snapshot. A report must not be described as reproducible from an archive when its manifest records unknown provenance.
 
 Ergast’s public API was retired after the 2024 season; the linked Kaggle dataset
 preserves the compatible table structure. Running
 `python scripts/download_data.py` fetches a new snapshot, validates required
-columns, and records the archive digest and response metadata when available.
+columns and minimum content counts, and records the archive digest and response
+metadata when available.
 
 The project uses this dataset as its raw-data source; the local `data/raw/` files are generated inputs and are intentionally not tracked.
+If the source includes an in-progress latest season, its entrants remain visible
+with unknown final targets and are excluded from walk-forward scoring until all
+scheduled races have result rows.
 
 ## Features & Approach
 
@@ -146,6 +153,7 @@ season's championship outcome is known:
 
 - Prior-season number and percentage of DNFs
 - Prior-season races started
+- Prior-season sprint points, included in the points-based baseline
 
 ### Team strength
 
@@ -166,9 +174,9 @@ test seasons, 2015–2024. RMSE measures position error, R² measures explained
 position variance, and Spearman ρ measures agreement in predicted order.
 
 The primary naïve baseline is **previous-season final order**: rank the current
-season's entrants by their prior-season championship points, assigning drivers
-without prior history zero points. It uses no fitted model and represents the
-simple pre-season guess that last season's order will persist. The delta column
+season's entrants by their prior-season race and sprint championship points,
+assigning drivers without prior history zero points. It uses no fitted model and
+represents the simple pre-season guess that last season's order will persist. The delta column
 is each row's Spearman ρ minus that naïve baseline on the same test season.
 
 | Model / baseline | Test seasons | Mean RMSE | RMSE SD | Mean R² | R² SD | Mean Spearman ρ | Spearman SD | Mean Δ vs naïve | Δ SD |

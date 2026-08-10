@@ -53,6 +53,22 @@ REQUIRED_COLUMNS = {
     "sprint_results.csv": {"raceId", "driverId", "points"},
     "status.csv": {"statusId", "status"},
 }
+MIN_ROW_COUNTS = {
+    "circuits.csv": 50,
+    "constructor_results.csv": 10_000,
+    "constructor_standings.csv": 10_000,
+    "constructors.csv": 100,
+    "driver_standings.csv": 30_000,
+    "drivers.csv": 500,
+    "lap_times.csv": 500_000,
+    "pit_stops.csv": 10_000,
+    "qualifying.csv": 10_000,
+    "races.csv": 1_000,
+    "results.csv": 20_000,
+    "seasons.csv": 70,
+    "sprint_results.csv": 300,
+    "status.csv": 100,
+}
 
 
 def sha256_file(path: Path) -> str:
@@ -69,12 +85,37 @@ def validate_raw_schema(output_dir: Path) -> None:
     for filename, expected in REQUIRED_COLUMNS.items():
         path = output_dir / filename
         with path.open("r", encoding="utf-8-sig", newline="") as source:
-            columns = set(next(csv.reader(source)))
+            try:
+                columns = set(next(csv.reader(source)))
+            except StopIteration as exc:
+                raise RuntimeError(f"{filename} is empty") from exc
         missing = sorted(expected - columns)
         if missing:
             raise RuntimeError(
                 f"{filename} is missing required columns: {', '.join(missing)}"
             )
+
+
+def validate_raw_content(
+    output_dir: Path,
+    minimum_rows: dict[str, int] | None = None,
+) -> None:
+    """Reject empty or materially truncated tables before publishing a snapshot."""
+    expected_rows = minimum_rows or MIN_ROW_COUNTS
+    failures = []
+    for filename in REQUIRED_FILES:
+        path = output_dir / filename
+        with path.open("r", encoding="utf-8-sig", newline="") as source:
+            reader = csv.reader(source)
+            next(reader, None)
+            row_count = sum(1 for _ in reader)
+        required_rows = expected_rows.get(filename, 1)
+        if row_count < required_rows:
+            failures.append(
+                f"{filename} has {row_count} data rows; expected at least {required_rows}"
+            )
+    if failures:
+        raise RuntimeError("Raw data content validation failed: " + "; ".join(failures))
 
 
 def collect_file_provenance(output_dir: Path) -> dict[str, dict[str, int | str]]:
@@ -99,6 +140,7 @@ def write_data_manifest(
 ) -> Path:
     """Write immutable identifiers for an existing raw-data snapshot."""
     validate_raw_schema(output_dir)
+    validate_raw_content(output_dir)
     manifest = {
         "source_url": DATASET_URL,
         "downloaded_at_utc": downloaded_at_utc,
@@ -154,6 +196,7 @@ def download_data(output_dir: Path = DEFAULT_OUTPUT_DIR) -> None:
                     shutil.copyfileobj(source, destination)
 
         validate_raw_schema(staging_dir)
+        validate_raw_content(staging_dir)
         for filename in REQUIRED_FILES:
             (staging_dir / filename).replace(output_dir / filename)
 

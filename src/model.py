@@ -96,16 +96,18 @@ def _regression_candidates() -> dict[str, tuple[object, list[str]]]:
 
 
 def previous_season_final_order(test_df: pd.DataFrame) -> pd.Series:
-    """Predict current order by ranking entrants on prior-season points.
+    """Predict current order by ranking entrants on prior-season total points.
 
     This is a deliberately simple pre-season baseline. Drivers without a
-    prior-season record receive zero points and ties use source-row order.
+    prior-season record receive zero points, sprint points are included, and
+    ties use source-row order.
     """
-    return (
-        test_df["prev_season_points_sum"]
-        .fillna(0)
-        .rank(method="first", ascending=False)
-    )
+    previous_points = test_df["prev_season_points_sum"].fillna(0)
+    if "prev_season_sprint_points_sum" in test_df:
+        previous_points = previous_points + test_df[
+            "prev_season_sprint_points_sum"
+        ].fillna(0)
+    return previous_points.rank(method="first", ascending=False)
 
 
 def bootstrap_position_predictions(

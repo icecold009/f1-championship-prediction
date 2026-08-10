@@ -26,7 +26,7 @@ jobs:
           python -m pip install -r requirements.txt
 
       - name: Build release artifacts
-        run: python scripts/build_release.py --download --year "${{ inputs.year }}"
+        run: python scripts/build_release.py --download --year "${{ inputs.year }}" --full-audit
 
       - name: Validate release artifacts
         run: python scripts/check_release.py --year "${{ inputs.year }}"

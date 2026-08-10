@@ -32,24 +32,29 @@ that baseline.
 
 - Source: [Formula 1 Race Data Kaggle dataset](https://www.kaggle.com/datasets/jtrotman/formula-1-race-data)
 - Layout: Ergast-compatible CSV tables.
-- Local snapshot: project-recorded pull date 2025-01-29, covering seasons through
-  2024.
+- Local snapshot: the pull timestamp and archive digest are recorded in
+  `data/raw/data_manifest.json`; the release manifest records the processed
+  season range for each build.
 - Raw CSVs are downloaded locally and are not committed to Git.
-- `data/raw/data_manifest.json` records SHA-256 and byte size for every raw
-  table. The release manifest copies those identifiers so a result can be tied
-  to exact input bytes even when the original archive digest is unavailable.
+- `data/raw/data_manifest.json` records an archive SHA-256 plus SHA-256 and byte
+  size for every raw table. The release manifest copies those identifiers so a
+  result can be tied to exact input bytes; validation rejects unknown archive
+  provenance.
 
 ## Prediction target and features
 
 Each row represents a driver entering a season. The target is that driver's
 final championship position and derived tier. Predictors contain prior-season
 driver statistics and the prior final championship position and points of the
-constructor they enter with. Four pre-season-safe cold-start indicators identify
-rookies, drivers returning after a gap, missing driver history, and missing
-constructor history.
+constructor they enter with. Race and sprint points are kept separate so the
+point-based baseline includes both. Four pre-season-safe cold-start indicators
+identify rookies, drivers returning after a gap, missing driver history, and
+missing constructor history.
 
 Same-season race outcomes are not predictors. The current season is used only
-to identify entrants and construct the final evaluation target. For historical
+to identify entrants and construct a final evaluation target when every
+scheduled race has result rows. Partial latest seasons remain as entrant rows
+with unknown targets and are excluded from historical scoring. For historical
 rows, the season-opening constructor is the first constructor observed in the
 race data; a production forecaster should replace this with a pre-season entry
 list.
@@ -64,8 +69,8 @@ list.
    aggregating their means and standard deviations.
 4. Tier classification reports per-season accuracy, macro F1, and per-class F1
    because the classes are imbalanced.
-5. The naive previous-season final-order and previous-season average-finish
-   methods are included as transparent baselines.
+5. The naive previous-season final-order baseline ranks by prior race plus sprint
+   points; the previous-season average-finish method is also included.
 
 ## Reported results
 
