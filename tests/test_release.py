@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 
 import scripts.build_release as build_release
+import scripts.check_release as check_release
 from scripts.check_release import RAW_FILES, validate_release
 
 
@@ -59,6 +60,27 @@ def test_is_dirty_worktree_reports_git_status(monkeypatch):
     assert build_release._is_dirty_worktree() is True
     assert calls["command"] == ["git", "status", "--porcelain"]
     assert calls["kwargs"]["cwd"] == build_release.BASE_DIR
+
+
+def test_source_changed_since_uses_pipeline_paths(monkeypatch, tmp_path):
+    calls = {}
+
+    def fake_run(command, **kwargs):
+        calls["command"] = command
+        calls["kwargs"] = kwargs
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(check_release.subprocess, "run", fake_run)
+
+    assert check_release._source_changed_since(tmp_path, "manifest-commit") is False
+    assert calls["command"][:5] == [
+        "git",
+        "diff",
+        "--quiet",
+        "manifest-commit..HEAD",
+        "--",
+    ]
+    assert "src" in calls["command"]
 
 
 def test_build_release_blocks_dirty_worktree(tmp_path, monkeypatch):

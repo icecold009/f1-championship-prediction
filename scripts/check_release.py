@@ -55,6 +55,15 @@ AUDIT_ARTIFACT_KEYS = {
     "permutation_importance_details.csv": "permutation_importance_details",
     "permutation_importance_summary.csv": "permutation_importance_summary",
 }
+RELEASE_SOURCE_PATHS = (
+    ".github",
+    "main.py",
+    "pyproject.toml",
+    "requirements.txt",
+    "requirements-dev.txt",
+    "scripts",
+    "src",
+)
 logger = logging.getLogger(__name__)
 
 
@@ -82,6 +91,27 @@ def _git_commit(base_dir: Path) -> str | None:
 
 def _normalise_artifact_path(value: object) -> str:
     return str(value).replace("\\", "/")
+
+
+def _source_changed_since(base_dir: Path, commit: str) -> bool:
+    """Return whether pipeline source changed after a manifest commit."""
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "diff",
+                "--quiet",
+                f"{commit}..HEAD",
+                "--",
+                *RELEASE_SOURCE_PATHS,
+            ],
+            cwd=base_dir,
+            capture_output=True,
+            check=False,
+        )
+        return result.returncode != 0
+    except OSError:
+        return True
 
 
 def validate_release(
@@ -126,9 +156,11 @@ def validate_release(
         and manifest_commit
         and manifest_commit != "unknown"
         and manifest_commit != current_commit
+        and _source_changed_since(base_dir, str(manifest_commit))
     ):
         errors.append(
-            f"Release manifest commit {manifest_commit} does not match HEAD {current_commit}"
+            f"Release manifest commit {manifest_commit} does not match current source "
+            f"at HEAD {current_commit}"
         )
 
     missing_raw = [name for name in RAW_FILES if not (raw_dir / name).exists()]
