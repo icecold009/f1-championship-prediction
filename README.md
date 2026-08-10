@@ -354,6 +354,14 @@ indicate more useful out-of-season information.
 | 9 | returning_after_gap | 0.082 | 0.135 | 7/10 |
 | 10 | prev_season_win_rate | 0.041 | 0.026 | 9/10 |
 
+## Next steps
+
+- Replace the season-opening-constructor approximation with an explicit pre-season entry list, as `MODEL_CARD.md` notes that the historical reconstruction currently takes the first constructor observed in race data.
+- Investigate leakage-safe prior-season aggregates from the qualifying and pit-stop tables that `create_features()` currently loads and discards with `del qualifying, pit_stops`.
+- Add per-season confusion matrices and class-support counts for all six tiers before changing the classifier, because Podium F1 **0.174** and Top 5 F1 **0.207** are close to unusable and do not show whether imbalance or adjacent-tier overlap dominates.
+- Treat rookies and returning-after-gap drivers as a separate cold-start evaluation slice, because missing prior-season values are imputed with zero and those groups have the largest observed MAE (**8.571** and **12.443**).
+- Keep the previous-season-order baseline as a model-selection gate for future changes, because it still beats every fitted regressor overall and the Random Forest loses nine of ten seasons on RMSE.
+
 ## Tech Stack
 
 - **Language:** Python 3.12–3.13
