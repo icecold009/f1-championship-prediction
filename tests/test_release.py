@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 
 import scripts.build_release as build_release
+import scripts.check_release as check_release
 from scripts.check_release import RAW_FILES, validate_release
 
 
@@ -38,7 +39,7 @@ def _stub_build_release(monkeypatch, tmp_path):
     monkeypatch.setattr(
         build_release,
         "create_report",
-        lambda year: results_dir / f"f1_prediction_report_{year}.html",
+        lambda year, **_kwargs: results_dir / f"f1_prediction_report_{year}.html",
     )
     monkeypatch.setattr(build_release, "collect_file_provenance", lambda _path: {})
     monkeypatch.setattr(build_release, "_package_versions", lambda: {})
@@ -59,6 +60,27 @@ def test_is_dirty_worktree_reports_git_status(monkeypatch):
     assert build_release._is_dirty_worktree() is True
     assert calls["command"] == ["git", "status", "--porcelain"]
     assert calls["kwargs"]["cwd"] == build_release.BASE_DIR
+
+
+def test_source_changed_since_uses_pipeline_paths(monkeypatch, tmp_path):
+    calls = {}
+
+    def fake_run(command, **kwargs):
+        calls["command"] = command
+        calls["kwargs"] = kwargs
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(check_release.subprocess, "run", fake_run)
+
+    assert check_release._source_changed_since(tmp_path, "manifest-commit") is False
+    assert calls["command"][:5] == [
+        "git",
+        "diff",
+        "--quiet",
+        "manifest-commit..HEAD",
+        "--",
+    ]
+    assert "src" in calls["command"]
 
 
 def test_build_release_blocks_dirty_worktree(tmp_path, monkeypatch):
@@ -108,6 +130,10 @@ def test_build_release_uses_fast_path_and_optional_full_audit(tmp_path, monkeypa
     monkeypatch.setattr(build_release, "_git_commit", lambda: "current-commit")
 
     build_release.build_release()
+    quick_manifest = json.loads(
+        (tmp_path / "results" / "release_manifest.json").read_text(encoding="utf-8")
+    )
+    assert quick_manifest["full_audit"] is False
     train_model_mock.assert_called_once_with(
         forecast_year=2023,
         skip_rolling_evaluation=True,
@@ -135,24 +161,24 @@ def test_validate_release_accepts_complete_artifact_layout(tmp_path):
     for directory in (raw_dir, processed_dir, models_dir, results_dir):
         directory.mkdir(parents=True)
     for filename in RAW_FILES:
-        (raw_dir / filename).touch()
+        (raw_dir / filename).write_bytes(f"raw data for {filename}\n".encode())
     files = {
         filename: {
-            "sha256": hashlib.sha256(b"").hexdigest(),
-            "bytes": 0,
+            "sha256": hashlib.sha256((raw_dir / filename).read_bytes()).hexdigest(),
+            "bytes": (raw_dir / filename).stat().st_size,
         }
         for filename in RAW_FILES
     }
     (raw_dir / "data_manifest.json").write_text(
-        json.dumps({"files": files}),
+        json.dumps({"files": files, "archive_sha256": "archive-digest"}),
         encoding="utf-8",
     )
 
     pd.DataFrame({"year": [2023], "driverId": [1], "champ_position": [1]}).to_csv(
         processed_dir / "features.csv", index=False
     )
-    (models_dir / "championship_model.pkl").touch()
-    (models_dir / "tier_classifier.pkl").touch()
+    (models_dir / "championship_model.pkl").write_bytes(b"model")
+    (models_dir / "tier_classifier.pkl").write_bytes(b"model")
     pd.DataFrame(
         {
             "Predicted Rank": [1],
@@ -167,7 +193,7 @@ def test_validate_release_accepts_complete_artifact_layout(tmp_path):
             "Top 5 Probability": [0.9],
         }
     ).to_csv(results_dir / "2023_predictions.csv", index=False)
-    for filename in (
+    artifact_files = (
         "predicted_vs_actual_2023.png",
         "f1_prediction_report_2023.html",
         "rolling_origin_summary.csv",
@@ -185,14 +211,40 @@ def test_validate_release_accepts_complete_artifact_layout(tmp_path):
         "uncertainty_calibration_bins.csv",
         "permutation_importance_details.csv",
         "permutation_importance_summary.csv",
-        "release_manifest.json",
-    ):
-        (results_dir / filename).touch()
+    )
+    for filename in artifact_files:
+        (results_dir / filename).write_bytes(b"artifact")
+
+    artifacts = {
+        "prediction": "results/2023_predictions.csv",
+        "chart": "results/predicted_vs_actual_2023.png",
+        "report": "results/f1_prediction_report_2023.html",
+        "uncertainty_calibration_details": "results/uncertainty_calibration_driver.csv",
+        "uncertainty_calibration_summary": "results/uncertainty_calibration_summary.csv",
+        "uncertainty_calibration_bins": "results/uncertainty_calibration_bins.csv",
+        "permutation_importance_details": "results/permutation_importance_details.csv",
+        "permutation_importance_summary": "results/permutation_importance_summary.csv",
+    }
+    (results_dir / "release_manifest.json").write_text(
+        json.dumps(
+            {
+                "prediction_year": 2023,
+                "full_audit": True,
+                "data": {"raw_files": files},
+                "artifacts": artifacts,
+            }
+        ),
+        encoding="utf-8",
+    )
 
     assert validate_release(tmp_path, year=2023) == []
 
+    manifest = json.loads(
+        (results_dir / "release_manifest.json").read_text(encoding="utf-8")
+    )
+    manifest["worktree_dirty"] = True
     (results_dir / "release_manifest.json").write_text(
-        json.dumps({"worktree_dirty": True}), encoding="utf-8"
+        json.dumps(manifest), encoding="utf-8"
     )
     assert validate_release(tmp_path, year=2023) == []
     errors = validate_release(tmp_path, year=2023, reject_dirty_manifest=True)

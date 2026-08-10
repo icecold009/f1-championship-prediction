@@ -78,16 +78,17 @@ def build_release(
     full_audit: bool = False,
 ) -> Path:
     """Regenerate all artifacts, validate them, and write a provenance manifest."""
-    if download:
-        from download_data import download_data
-
-        download_data()
     worktree_dirty = _is_dirty_worktree()
     if worktree_dirty and not allow_dirty:
         raise RuntimeError(
             "Refusing to build a release from a dirty Git worktree; "
             "commit your changes or pass --allow-dirty."
         )
+
+    if download:
+        from download_data import download_data
+
+        download_data()
 
     raw_manifest_path = BASE_DIR / "data" / "raw" / "data_manifest.json"
     if not raw_manifest_path.exists():
@@ -118,7 +119,7 @@ def build_release(
         output_dir=RESULTS_DIR,
     )
     chart_path = create_visualisation(year)
-    report_path = create_report(year)
+    report_path = create_report(year, include_audit=full_audit)
 
     manifest_path = RESULTS_DIR / "release_manifest.json"
     current_git_commit = _git_commit()
@@ -144,6 +145,7 @@ def build_release(
         "prediction_year": year,
         "git_commit": current_git_commit,
         "generated_at_utc": datetime.now(UTC).isoformat(),
+        "full_audit": full_audit,
         "python_version": platform.python_version(),
         "packages": _package_versions(),
         "data": {
@@ -173,19 +175,24 @@ def build_release(
             "error_analysis_group": "results/error_analysis_group_summary.csv",
             "paired_baseline_summary": "results/model_vs_naive_summary.csv",
             "paired_baseline_chart": "results/model_vs_naive_by_season.png",
-            "uncertainty_calibration_summary": "results/uncertainty_calibration_summary.csv",
-            "uncertainty_calibration_details": "results/uncertainty_calibration_driver.csv",
-            "uncertainty_calibration_bins": "results/uncertainty_calibration_bins.csv",
-            "permutation_importance_summary": "results/permutation_importance_summary.csv",
-            "permutation_importance_details": "results/permutation_importance_details.csv",
         },
     }
+    if full_audit:
+        manifest["artifacts"].update(
+            {
+                "uncertainty_calibration_summary": "results/uncertainty_calibration_summary.csv",
+                "uncertainty_calibration_details": "results/uncertainty_calibration_driver.csv",
+                "uncertainty_calibration_bins": "results/uncertainty_calibration_bins.csv",
+                "permutation_importance_summary": "results/permutation_importance_summary.csv",
+                "permutation_importance_details": "results/permutation_importance_details.csv",
+            }
+        )
     if worktree_dirty:
         manifest["worktree_dirty"] = True
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
-    errors = validate_release(year=year)
+    errors = validate_release(year=year, require_full_audit=full_audit)
     if errors:
         raise RuntimeError("Release check failed: " + " | ".join(errors))
     logger.info("Release manifest saved to %s", manifest_path)

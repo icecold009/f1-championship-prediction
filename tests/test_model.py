@@ -49,6 +49,17 @@ def test_previous_season_final_order_is_an_explicit_naive_baseline():
     assert previous_season_final_order(test_df).tolist() == [1.0, 2.0, 3.0]
 
 
+def test_previous_season_final_order_includes_sprint_points():
+    test_df = pd.DataFrame(
+        {
+            "prev_season_points_sum": [100.0, 95.0],
+            "prev_season_sprint_points_sum": [0.0, 10.0],
+        }
+    )
+
+    assert previous_season_final_order(test_df).tolist() == [2.0, 1.0]
+
+
 def test_bootstrap_position_predictions_returns_rank_probabilities_without_leakage():
     rows = []
     for year in range(2010, 2015):

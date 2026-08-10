@@ -3,6 +3,66 @@ import pandas as pd
 from src import data_processing
 
 
+def test_status_classification_distinguishes_finished_dnf_and_non_start():
+    status = pd.DataFrame(
+        {
+            "statusId": [1, 2, 3, 4, 5],
+            "status": [
+                "Finished",
+                "+1 Lap",
+                "Engine",
+                "Did not start",
+                "Withdrew",
+            ],
+        }
+    )
+
+    finished_ids, non_started_ids = data_processing._status_ids(status)
+
+    assert finished_ids == {1, 2}
+    assert non_started_ids == {4, 5}
+    assert 3 not in finished_ids | non_started_ids
+
+
+def test_completed_seasons_exclude_partial_calendar():
+    races = pd.DataFrame({"raceId": [1, 2, 3], "year": [2024, 2024, 2025]})
+    results = pd.DataFrame({"raceId": [1, 2], "driverId": [10, 10]})
+
+    assert data_processing._completed_season_years(races, results) == {2024}
+
+
+def test_complete_driver_standings_assigns_missing_zero_point_entrants():
+    entries = pd.DataFrame({"year": [2020, 2020], "driverId": [1, 2]})
+    known = pd.DataFrame(
+        {
+            "year": [2020],
+            "driverId": [1],
+            "champ_position": [1],
+            "champ_points": [25.0],
+        }
+    )
+    stats = pd.DataFrame(
+        {
+            "year": [2020, 2020],
+            "driverId": [1, 2],
+            "points_sum": [25.0, 0.0],
+            "wins": [1, 0],
+            "podiums": [1, 0],
+            "best_finish": [1, pd.NA],
+            "races_started": [1, 0],
+        }
+    )
+    sprint = pd.DataFrame(columns=["year", "driverId", "sprint_points_sum"])
+
+    completed = data_processing._complete_driver_standings(
+        entries, known, stats, sprint
+    )
+
+    missing = completed.loc[completed["driverId"] == 2].iloc[0]
+    assert missing["champ_position"] == 2
+    assert missing["champ_points"] == 0
+
+
 def test_create_features_uses_prior_season_only(tmp_path, monkeypatch):
     races = pd.DataFrame(
         {

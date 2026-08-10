@@ -9,7 +9,12 @@ From a clean checkout:
 
 ```bash
 pip install -r requirements.txt
+# Fast local bundle (omits the slow historical audit)
 python scripts/build_release.py --download --year 2023
+python scripts/check_release.py --quick --year 2023
+
+# Validated evidence bundle (required for publication/sharing)
+python scripts/build_release.py --download --year 2023 --full-audit
 python scripts/check_release.py --year 2023
 ```
 
@@ -19,10 +24,13 @@ HTML report, regression and tier rolling-origin evaluation files, and
 and package versions, data snapshot, row/season counts, evaluation summary,
 and generated artifact paths.
 
-The full build also runs the slower historical model audit: 100 season-level
-bootstrap refits per held-out season, rolling conformal coverage, Brier scores,
-and held-out permutation importance. Use `python main.py --year YEAR --report`
-for a quicker local forecast when those audit artifacts are already available.
+The fast build records `full_audit: false` and is accepted only by
+`check_release.py --quick`. The validated build records `full_audit: true` and
+runs the slower historical model audit: 100 season-level bootstrap refits per
+held-out season, rolling conformal coverage, Brier scores, and held-out
+permutation importance. The validator also checks the manifest mode, current
+Git commit, raw-table hashes and sizes, non-empty artifacts, prediction ranks,
+and probability ranges.
 
 ## GitHub Actions artifact build
 

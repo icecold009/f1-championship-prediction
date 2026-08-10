@@ -32,31 +32,36 @@ that baseline.
 
 - Source: [Formula 1 Race Data Kaggle dataset](https://www.kaggle.com/datasets/jtrotman/formula-1-race-data)
 - Layout: Ergast-compatible CSV tables.
-- Local snapshot: project-recorded pull date 2025-01-29, covering seasons through
-  2024.
+- Local snapshot: the pull timestamp and archive digest are recorded in
+  `data/raw/data_manifest.json`; the release manifest records the processed
+  season range for each build.
 - Raw CSVs are downloaded locally and are not committed to Git.
-- `data/raw/data_manifest.json` records SHA-256 and byte size for every raw
-  table. The release manifest copies those identifiers so a result can be tied
-  to exact input bytes even when the original archive digest is unavailable.
+- `data/raw/data_manifest.json` records an archive SHA-256 plus SHA-256 and byte
+  size for every raw table. The release manifest copies those identifiers so a
+  result can be tied to exact input bytes; validation rejects unknown archive
+  provenance.
 
 ## Prediction target and features
 
 Each row represents a driver entering a season. The target is that driver's
 final championship position and derived tier. Predictors contain prior-season
 driver statistics and the prior final championship position and points of the
-constructor they enter with. Four pre-season-safe cold-start indicators identify
-rookies, drivers returning after a gap, missing driver history, and missing
-constructor history.
+constructor they enter with. Race and sprint points are kept separate so the
+point-based baseline includes both. Four pre-season-safe cold-start indicators
+identify rookies, drivers returning after a gap, missing driver history, and
+missing constructor history.
 
 Same-season race outcomes are not predictors. The current season is used only
-to identify entrants and construct the final evaluation target. For historical
+to identify entrants and construct a final evaluation target when every
+scheduled race has result rows. Partial latest seasons remain as entrant rows
+with unknown targets and are excluded from historical scoring. For historical
 rows, the season-opening constructor is the first constructor observed in the
 race data; a production forecaster should replace this with a pre-season entry
 list.
 
 ## Evaluation protocol
 
-1. For each test season from 2015–2024, training uses all seasons earlier than
+1. For each test season from 2016–2025, training uses all seasons earlier than
    that test season.
 2. Every test season is held out in full; no rows from the test season appear in
    training, and no random row split is used.
@@ -64,21 +69,21 @@ list.
    aggregating their means and standard deviations.
 4. Tier classification reports per-season accuracy, macro F1, and per-class F1
    because the classes are imbalanced.
-5. The naive previous-season final-order and previous-season average-finish
-   methods are included as transparent baselines.
+5. The naive previous-season final-order baseline ranks by prior race plus sprint
+   points; the previous-season average-finish method is also included.
 
 ## Reported results
 
-Walk-forward means across 2015–2024:
+Walk-forward means across 2016–2025:
 
 | Model / baseline | Test seasons | Mean RMSE | RMSE SD | Mean R² | R² SD | Mean Spearman | Spearman SD | Mean Δ vs naive | Δ SD |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| Naive: previous-season final order | 10 | 3.758 | 0.747 | 0.641 | 0.161 | 0.821 | 0.081 | 0.000 | 0.000 |
-| Random Forest (history only) | 10 | 6.657 | 2.818 | -0.277 | 1.042 | 0.808 | 0.061 | -0.012 | 0.065 |
-| Random Forest + cold-start flags | 10 | 6.531 | 2.704 | -0.217 | 0.998 | 0.807 | 0.051 | -0.014 | 0.055 |
-| Gradient Boosting | 10 | 6.938 | 2.630 | -0.346 | 1.028 | 0.784 | 0.058 | -0.036 | 0.084 |
-| Baseline: previous avg finish | 10 | 4.564 | 0.875 | 0.462 | 0.273 | 0.783 | 0.085 | -0.038 | 0.031 |
-| Ridge | 10 | 9.517 | 2.178 | -1.359 | 1.235 | 0.777 | 0.057 | -0.043 | 0.066 |
+| Naive: previous-season final order | 10 | 3.728 | 0.744 | 0.641 | 0.168 | 0.821 | 0.084 | 0.000 | 0.000 |
+| Random Forest (history only) | 10 | 6.189 | 2.301 | -0.071 | 0.823 | 0.807 | 0.058 | -0.014 | 0.074 |
+| Random Forest + cold-start flags | 10 | 5.982 | 1.969 | 0.026 | 0.668 | 0.811 | 0.045 | -0.010 | 0.065 |
+| Gradient Boosting | 10 | 6.302 | 2.087 | -0.089 | 0.754 | 0.757 | 0.095 | -0.064 | 0.113 |
+| Baseline: previous avg finish | 10 | 4.543 | 0.706 | 0.466 | 0.247 | 0.788 | 0.073 | -0.033 | 0.025 |
+| Ridge | 10 | 9.081 | 1.572 | -1.135 | 1.018 | 0.734 | 0.090 | -0.087 | 0.061 |
 
 These values are regenerated with:
 
@@ -87,38 +92,38 @@ python scripts/evaluate.py
 ```
 
 The naive baseline ranks each test-season entrant by prior-season championship
-points, assigning zero to drivers without prior history. The delta columns are
+race plus sprint points, assigning zero to drivers without prior history. The delta columns are
 computed against that same-season baseline before aggregation.
 
 Paired season-level bootstrap intervals show that the history-only Random
-Forest's mean Spearman difference versus the naive baseline is -0.012 with a
-95% interval of [-0.051, 0.026]. It wins five seasons and loses five on
-Spearman, but loses nine of ten seasons on RMSE. The cold-start model improves
-mean RMSE by 0.126 positions relative to the history-only forest while slightly
-reducing mean Spearman. These mixed results are treated as an ablation, not a
+Forest's mean Spearman difference versus the naive baseline is -0.014 with a
+95% interval of [-0.057, 0.029]. It wins four seasons and loses six on
+Spearman, and loses eight of ten seasons on RMSE. The cold-start model improves
+mean RMSE by 0.207 positions relative to the history-only forest and improves
+mean Spearman by 0.004. These mixed results are treated as an ablation, not a
 claim of general improvement.
 
 Tier classification walk-forward metrics. The mean macro F1 headline is
-**0.441**, but it should not be read as uniform usefulness across tiers. Podium
-F1 **0.174** and Top 5 F1 **0.207** are close to unusable for individual driver
+**0.414**, but it should not be read as uniform usefulness across tiers. Podium
+F1 **0.183** and Top 5 F1 **0.217** are close to unusable for individual driver
 classification. This is a 200-tree Random Forest with `max_depth=8`, trained on
 `FEATURE_COLUMNS` from `src/model.py`; the weak results likely reflect class
 imbalance across the six tiers and/or overlapping feature distributions between
-adjacent tiers. Champion F1 **0.800** and Backmarker F1 **0.681** are the tiers
+adjacent tiers. Champion F1 **0.700** and Backmarker F1 **0.685** are the tiers
 where the classifier is genuinely useful for individual driver classification.
 
 | Model | Test seasons | Mean accuracy | Accuracy SD | Mean macro F1 | Macro F1 SD |
 |---|---:|---:|---:|---:|---:|
-| Random Forest | 10 | 0.509 | 0.072 | 0.441 | 0.073 |
+| Random Forest | 10 | 0.498 | 0.083 | 0.414 | 0.078 |
 
 | Tier | Test seasons | Mean F1 | F1 SD |
 |---|---:|---:|---:|
-| Champion | 10 | 0.800 | 0.322 |
-| Podium | 10 | 0.174 | 0.283 |
-| Top 5 | 10 | 0.207 | 0.274 |
-| Top 10 | 10 | 0.511 | 0.143 |
-| Midfield | 10 | 0.271 | 0.193 |
-| Backmarker | 10 | 0.681 | 0.120 |
+| Champion | 10 | 0.700 | 0.399 |
+| Podium | 10 | 0.183 | 0.299 |
+| Top 5 | 10 | 0.217 | 0.284 |
+| Top 10 | 10 | 0.518 | 0.159 |
+| Midfield | 10 | 0.184 | 0.181 |
+| Backmarker | 10 | 0.685 | 0.104 |
 
 ## Uncertainty estimates
 
@@ -134,27 +139,27 @@ not calibrated probabilities, prediction intervals with guaranteed coverage, or
 betting odds; the model does not claim that a 62% bootstrap frequency equals a
 62% real-world chance.
 
-Historical calibration confirms this limitation. Across 223 driver-seasons, the
-bootstrap P05–P95 interval covers the actual position only 32.3% of the time,
-with mean width 4.92 positions. Rolling conformal intervals use only prior
-out-of-fold residuals and reach 96.4% coverage, but their mean width is 19.68
-positions. The top-three and champion Brier scores are 0.068 and 0.019,
-respectively. The 80–100% top-three bin is overconfident: mean prediction 95.4%
-versus 77.3% observed.
+Historical calibration confirms this limitation. Across 222 driver-seasons, the
+bootstrap P05–P95 interval covers the actual position only 34.2% of the time,
+with mean width 4.896 positions. Rolling conformal intervals use only prior
+out-of-fold residuals and reach 97.7% coverage, but their mean width is 19.899
+positions. The top-three and champion Brier scores are 0.070 and 0.021,
+respectively. The 80–100% top-three bin is overconfident: mean prediction 96.7%
+versus 78.9% observed.
 
 ## Where this model breaks
 
 The walk-forward Random Forest errors are also segmented post-hoc by driver and
 season context. Returning drivers with no immediately prior history have the
-largest average error (MAE 12.443 across 11 observations), followed by rookies
-(MAE 8.571 across 33 observations). Established returning drivers are materially
-more predictable (MAE 3.198 across 179 observations). Mid-season constructor
-swaps have MAE 5.416 across only seven observations, so that comparison is
+largest average error (MAE 12.562 across 11 observations), followed by rookies
+(MAE 7.362 across 31 observations). Established returning drivers are materially
+more predictable (MAE 3.138 across 180 observations). Mid-season constructor
+swaps have MAE 4.497 across only nine observations, so that comparison is
 directional rather than conclusive.
 
-The 2022 regulation-change case study has RMSE 5.209, MAE 4.117, and Spearman
-0.843. It is not the worst test season in this sample; 2015 has the largest MAE
-at 7.697. This prevents the analysis from turning a plausible regulation-change
+The 2022 regulation-change case study has RMSE 5.519, MAE 4.355, and Spearman
+0.832. It is not the worst test season in this sample; 2019 has the largest MAE
+at 6.036. This prevents the analysis from turning a plausible regulation-change
 story into an unsupported claim. See the generated error-analysis CSVs for the
 complete per-driver and per-season evidence.
 

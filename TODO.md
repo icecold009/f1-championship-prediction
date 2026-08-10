@@ -1,45 +1,22 @@
-# Final merge TODO
+# Future work
 
-Branch: `feat/professional-release`
+The previously identified release blockers are implemented on the current
+feature branch: release builds have explicit quick/full-audit modes, raw
+downloads are staged and content-validated, manifests bind artifacts to the
+current commit and input hashes, targets cover all observed entrants, and the
+published notebook/docs are refreshed with the canonical feature schema.
 
-The feature branch is complete locally, but resolve these items before merging
-to `main`.
+Remaining work is intentionally non-blocking product research:
 
-## Merge blockers
+- Replace the season-opening-constructor approximation with an explicit
+  pre-season entry list.
+- Add leakage-safe prior-season aggregates from qualifying and pit-stop tables.
+- Add per-season confusion matrices and class-support counts for all tiers.
+- Evaluate rookies and returning-after-gap drivers as a dedicated cold-start
+  slice.
+- Keep the previous-season total-points baseline as a model-selection gate for
+  future model changes.
 
-- [ ] Harden release provenance in `scripts/build_release.py`.
-  - Detect a dirty worktree before building, or record the dirty state and fail
-    validation when source files are uncommitted.
-  - Regenerate the published manifest/report after the final code commit so the
-    artifact source commit is explicit and current.
-
-- [ ] Make `scripts/download_data.py` atomic.
-  - Extract and validate all CSVs in a temporary staging directory.
-  - Replace the existing raw snapshot only after every required file, schema,
-    and checksum passes.
-  - Add a test proving a failed download does not leave a mixed snapshot.
-
-- [ ] Reduce release-build runtime in `scripts/build_release.py` and `src/model.py`.
-  - Avoid running the same rolling evaluation inside `train_model()` and again
-    from `build_release.py`.
-  - Add a quick release path and make the full calibration audit opt-in, for
-    example `--full-audit`.
-  - Keep the full audit available for deliberate evidence refreshes.
-
-## Final verification
-
-- [ ] Run Ruff lint and formatting checks.
-- [ ] Run the test suite with coverage.
-- [ ] Run `python scripts/check_release.py --year 2023`.
-- [ ] Confirm `docs/release_manifest.json` points to the final source commit.
-- [ ] Push `feat/professional-release`.
-- [ ] Open the PR against `main` and wait for GitHub Actions CI.
-- [ ] Review the PR diff and CI result.
-- [ ] Merge only after explicit approval.
-
-## Current evidence
-
-- 26 local tests passed.
-- Ruff lint and formatting passed.
-- Release check passed for 2023.
-- `main` has not been changed.
+Generated release artifacts remain ignored; regenerate them with
+`python scripts/build_release.py --download --year YEAR --full-audit` after a
+clean source commit.

@@ -25,9 +25,10 @@ def _dataset_archive() -> tuple[bytes, dict[str, bytes]]:
     for filename in download_data.REQUIRED_FILES:
         columns = download_data.REQUIRED_COLUMNS.get(filename)
         if columns:
-            content = (",".join(sorted(columns)) + "\n").encode()
+            header = ",".join(sorted(columns))
+            content = (header + "\n" + ",".join("0" for _ in columns) + "\n").encode()
         else:
-            content = f"new content for {filename}\n".encode()
+            content = f"column\nnew content for {filename}\n".encode()
         files[filename] = content
 
     archive_buffer = io.BytesIO()
@@ -99,6 +100,11 @@ def test_download_success_replaces_all_raw_files_and_preserves_provenance(
         "urlopen",
         lambda *_args, **_kwargs: _FakeResponse(archive_payload, headers),
     )
+    monkeypatch.setattr(
+        download_data,
+        "MIN_ROW_COUNTS",
+        {filename: 1 for filename in download_data.REQUIRED_FILES},
+    )
 
     download_data.download_data(output_dir)
 
@@ -111,3 +117,14 @@ def test_download_success_replaces_all_raw_files_and_preserves_provenance(
     assert manifest["source_last_modified"] == headers["Last-Modified"]
     assert manifest["archive_sha256"] == hashlib.sha256(archive_payload).hexdigest()
     assert set(manifest["files"]) == set(download_data.REQUIRED_FILES)
+
+
+def test_raw_content_rejects_header_only_snapshot(tmp_path):
+    for filename in download_data.REQUIRED_FILES:
+        columns = download_data.REQUIRED_COLUMNS.get(filename, {"column"})
+        (tmp_path / filename).write_text(
+            ",".join(sorted(columns)) + "\n", encoding="utf-8"
+        )
+
+    with pytest.raises(RuntimeError, match="Raw data content validation failed"):
+        download_data.validate_raw_content(tmp_path)
