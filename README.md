@@ -207,7 +207,14 @@ than the naïve baseline in that season; an RMSE win means lower error.
 The tier classifier is also retrained before each test season. Accuracy is the
 fraction of correctly classified drivers, while macro F1 gives each tier equal
 weight. The previous ambiguous “CV Accuracy” value has been removed; these are
-walk-forward test-season metrics only.
+walk-forward test-season metrics only. The mean macro F1 headline is **0.441**,
+but it should not be read as uniform usefulness across tiers. Podium F1 **0.174**
+and Top 5 F1 **0.207** are close to unusable for individual driver
+classification. This is a 200-tree Random Forest with `max_depth=8`, trained on
+`FEATURE_COLUMNS` from `src/model.py`; the weak results likely reflect class
+imbalance across the six tiers and/or overlapping feature distributions between
+adjacent tiers. Champion F1 **0.800** and Backmarker F1 **0.681** are the tiers
+where the classifier is genuinely useful for individual driver classification.
 
 | Model | Test seasons | Mean accuracy | Accuracy SD | Mean macro F1 | Macro F1 SD |
 |---|---:|---:|---:|---:|---:|
