@@ -98,7 +98,14 @@ mean RMSE by 0.126 positions relative to the history-only forest while slightly
 reducing mean Spearman. These mixed results are treated as an ablation, not a
 claim of general improvement.
 
-Tier classification walk-forward metrics:
+Tier classification walk-forward metrics. The mean macro F1 headline is
+**0.441**, but it should not be read as uniform usefulness across tiers. Podium
+F1 **0.174** and Top 5 F1 **0.207** are close to unusable for individual driver
+classification. This is a 200-tree Random Forest with `max_depth=8`, trained on
+`FEATURE_COLUMNS` from `src/model.py`; the weak results likely reflect class
+imbalance across the six tiers and/or overlapping feature distributions between
+adjacent tiers. Champion F1 **0.800** and Backmarker F1 **0.681** are the tiers
+where the classifier is genuinely useful for individual driver classification.
 
 | Model | Test seasons | Mean accuracy | Accuracy SD | Mean macro F1 | Macro F1 SD |
 |---|---:|---:|---:|---:|---:|

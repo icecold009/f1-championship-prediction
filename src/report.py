@@ -189,8 +189,37 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
         top_driver_detail = top_team
 
     table_markup = predictions.to_html(
-        index=False, classes="data-table", border=0, justify="left"
+        index=False,
+        classes="data-table",
+        border=0,
+        justify="left",
+        table_id="prediction-table",
     )
+    prediction_sort_script = """<script>
+(() => {
+  const select = document.getElementById("prediction-sort");
+  const table = document.getElementById("prediction-table");
+  if (!select || !table || !table.tBodies.length) return;
+
+  const body = table.tBodies[0];
+  const rows = Array.from(body.rows);
+  const sortRows = () => {
+    const column = Number(select.value);
+    const descending = column === 12;
+    rows.sort((left, right) => {
+      const leftValue = Number.parseFloat(left.cells[column].textContent.trim());
+      const rightValue = Number.parseFloat(right.cells[column].textContent.trim());
+      if (Number.isNaN(leftValue) && Number.isNaN(rightValue)) return 0;
+      if (Number.isNaN(leftValue)) return 1;
+      if (Number.isNaN(rightValue)) return -1;
+      return (leftValue - rightValue) * (descending ? -1 : 1);
+    });
+    rows.forEach((row) => body.appendChild(row));
+  };
+
+  select.addEventListener("change", sortRows);
+})();
+</script>"""
     cards = "".join(
         [
             _card("Point forecast champion", top_driver, top_driver_detail),
@@ -241,6 +270,8 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
     .data-table th, .data-table td {{ border-bottom: 1px solid var(--line); padding: 11px 10px; white-space: nowrap; }}
     .data-table tr:first-child td {{ font-weight: 800; }}
     .data-table tr:hover td {{ background: #f8faff; }}
+    .table-controls {{ display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--muted); font-size: 13px; }}
+    .table-controls select {{ border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; color: var(--ink); background: var(--panel); }}
     img {{ display: block; max-width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--line); }}
     code {{ background: #eef1f7; border-radius: 5px; padding: 2px 5px; }}
     footer {{ color: var(--muted); font-size: 13px; margin-top: 22px; }}
@@ -295,7 +326,16 @@ def create_report(year: int = 2023, output_path: Path | None = None) -> Path:
     </section>
     <section class="panel">
       <h2>Predicted order</h2>
+      <div class="table-controls">
+        <label for="prediction-sort">Sort rows by</label>
+        <select id="prediction-sort">
+          <option value="0">Predicted Rank</option>
+          <option value="12">Champion Probability (highest first)</option>
+          <option value="9">Bootstrap Position SD (lowest first)</option>
+        </select>
+      </div>
       {table_markup}
+      {prediction_sort_script}
     </section>
     <footer>Generated locally from the pinned project pipeline. See MODEL_CARD.md for intended use and limitations.</footer>
   </main>
