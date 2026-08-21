@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from scripts.evaluate import run_evaluation, summarize_paired_comparisons
+from scripts.evaluate import run_evaluation, summarize_paired_comparisons, validate_baseline_gate
 from scripts.model_audit import evaluate_permutation_importance, evaluate_uncertainty
 from src.model import FEATURE_COLUMNS, NAIVE_BASELINE_NAME
 
@@ -42,6 +42,21 @@ def test_paired_summary_reports_season_wins_and_interval():
     assert summary["rmse_wins"] == 1
     assert summary["rmse_losses"] == 1
     assert np.isfinite(summary["spearman_delta_ci95_low"])
+
+
+def test_baseline_gate_reports_candidate_failure_without_hiding_baseline():
+    summary = pd.DataFrame(
+        {
+            "model": [NAIVE_BASELINE_NAME, "Random Forest"],
+            "mean_spearman": [0.82, 0.81],
+        }
+    )
+
+    decision = validate_baseline_gate(summary)
+
+    assert decision["baseline_model"] == NAIVE_BASELINE_NAME
+    assert decision["passed"] is False
+    assert decision["candidate_models"][0]["passes_baseline_gate"] is False
 
 
 def test_uncertainty_and_permutation_audits_are_strictly_chronological():
@@ -85,3 +100,4 @@ def test_evaluation_pipeline_writes_professional_artifacts(tmp_path):
     assert (tmp_path / "rolling_origin_summary_details.csv").exists()
     assert (tmp_path / "model_vs_naive_summary.csv").exists()
     assert (tmp_path / "model_vs_naive_by_season.png").exists()
+    assert (tmp_path / "tier_rolling_origin_confusion.csv").exists()

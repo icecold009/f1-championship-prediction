@@ -1,6 +1,7 @@
 """Run the reproducible rolling-origin evaluation protocol."""
 
 import argparse
+import json
 import logging
 import sys
 from pathlib import Path
@@ -135,6 +136,53 @@ def summarize_paired_comparisons(details: pd.DataFrame) -> pd.DataFrame:
     )
 
 
+def validate_baseline_gate(
+    summary: pd.DataFrame,
+    *,
+    tolerance: float = 0.0,
+) -> dict[str, object]:
+    """Return an explicit model-selection decision against the naive baseline."""
+
+    baseline_rows = summary.loc[summary["model"] == NAIVE_BASELINE_NAME]
+    if baseline_rows.empty:
+        raise ValueError("The previous-season total-points baseline is missing")
+    baseline = float(baseline_rows.iloc[0]["mean_spearman"])
+    candidates = summary.loc[summary["model"] != NAIVE_BASELINE_NAME].copy()
+    candidates["passes_baseline_gate"] = candidates["mean_spearman"] >= baseline - tolerance
+    return {
+        "baseline_model": NAIVE_BASELINE_NAME,
+        "baseline_mean_spearman": baseline,
+        "tolerance": tolerance,
+        "candidate_models": candidates[["model", "mean_spearman", "passes_baseline_gate"]].to_dict("records"),
+        "passed": bool(candidates.empty or candidates["passes_baseline_gate"].all()),
+    }
+
+
+def expand_tier_confusion(details: pd.DataFrame) -> pd.DataFrame:
+    """Expand per-season confusion/support JSON into an auditable long table."""
+
+    labels = TIER_LABELS
+    rows: list[dict[str, object]] = []
+    for _, record in details.iterrows():
+        matrix = json.loads(record["confusion_matrix_json"])
+        actual_support = json.loads(record["actual_support_json"])
+        predicted_support = json.loads(record["predicted_support_json"])
+        for actual_index, actual_label in enumerate(labels):
+            for predicted_index, predicted_label in enumerate(labels):
+                rows.append(
+                    {
+                        "test_year": int(record["test_year"]),
+                        "model": record["model"],
+                        "actual_tier": actual_label,
+                        "predicted_tier": predicted_label,
+                        "count": int(matrix[actual_index][predicted_index]),
+                        "actual_support": int(actual_support.get(actual_label, 0)),
+                        "predicted_support": int(predicted_support.get(predicted_label, 0)),
+                    }
+                )
+    return pd.DataFrame(rows)
+
+
 def create_baseline_comparison_chart(
     details: pd.DataFrame,
     output_path: Path,
@@ -170,6 +218,7 @@ def run_evaluation(
     test_seasons: int = 10,
     min_train_seasons: int = 20,
     rebuild_features: bool = False,
+    require_baseline_gate: bool = False,
 ) -> pd.DataFrame:
     """Run rolling-origin evaluation and save summary and detail CSVs."""
     if rebuild_features or not features_path.exists():
@@ -211,6 +260,7 @@ def run_evaluation(
     paired_chart_path = output_path.with_name("model_vs_naive_by_season.png")
     summary = summarize_results(details)
     paired_summary = summarize_paired_comparisons(details)
+    baseline_gate = validate_baseline_gate(summary)
     tier_summary = summarize_tier_results(tier_details)
     tier_class_summary = summarize_tier_classes(tier_details)
     summary.to_csv(output_path, index=False)
@@ -218,6 +268,9 @@ def run_evaluation(
     tier_summary.to_csv(tier_output_path, index=False)
     tier_details.to_csv(tier_details_path, index=False)
     tier_class_summary.to_csv(tier_class_output_path, index=False)
+    expand_tier_confusion(tier_details).to_csv(
+        output_path.with_name("tier_rolling_origin_confusion.csv"), index=False
+    )
     paired_summary.to_csv(paired_output_path, index=False)
     create_baseline_comparison_chart(details, paired_chart_path)
 
@@ -232,6 +285,9 @@ def run_evaluation(
     logger.info("\n%s", tier_summary.to_string(index=False))
     logger.info("\n%s", tier_class_summary.to_string(index=False))
     logger.info("\n%s", paired_summary.to_string(index=False))
+    logger.info("Baseline gate: %s", json.dumps(baseline_gate, sort_keys=True))
+    if require_baseline_gate and not baseline_gate["passed"]:
+        raise ValueError("Model-selection baseline gate failed: no candidate meets the naive baseline")
     return summary
 
 
@@ -277,6 +333,11 @@ def main() -> int:
         action="store_true",
         help="Rebuild data/processed/features.csv from data/raw first",
     )
+    parser.add_argument(
+        "--require-baseline-gate",
+        action="store_true",
+        help="Fail if every evaluated candidate does not meet the previous-season baseline.",
+    )
     args = parser.parse_args()
 
     try:
@@ -286,6 +347,7 @@ def main() -> int:
             test_seasons=args.test_seasons,
             min_train_seasons=args.min_train_seasons,
             rebuild_features=args.rebuild_features,
+            require_baseline_gate=args.require_baseline_gate,
         )
     except (FileNotFoundError, ValueError) as exc:
         logger.error("Evaluation failed: %s", exc)

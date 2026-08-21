@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import pickle
@@ -12,7 +13,7 @@ from sklearn.ensemble import (
     RandomForestRegressor,
 )
 from sklearn.linear_model import Ridge
-from sklearn.metrics import accuracy_score, f1_score, mean_squared_error, r2_score
+from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, mean_squared_error, r2_score
 
 logger = logging.getLogger(__name__)
 
@@ -311,6 +312,15 @@ def evaluate_tier_rolling_origin(
                     average="macro",
                     zero_division=0,
                 )
+            ),
+            "confusion_matrix_json": json.dumps(
+                confusion_matrix(y_test, predictions, labels=TIER_LABELS).tolist()
+            ),
+            "actual_support_json": json.dumps(
+                y_test.value_counts().reindex(TIER_LABELS, fill_value=0).astype(int).to_dict()
+            ),
+            "predicted_support_json": json.dumps(
+                pd.Series(predictions).value_counts().reindex(TIER_LABELS, fill_value=0).astype(int).to_dict()
             ),
         }
         row.update(
