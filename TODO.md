@@ -6,6 +6,10 @@ downloads are staged and content-validated, manifests bind artifacts to the
 current commit and input hashes, targets cover all observed entrants, and the
 published notebook/docs are refreshed with the canonical feature schema.
 
+The evaluation implementation now emits per-season tier confusion/support
+evidence and exposes an opt-in previous-season-baseline model-selection gate.
+Run the full release build before marking those evidence tasks complete.
+
 Remaining work is intentionally non-blocking product research:
 
 - Replace the season-opening-constructor approximation with an explicit

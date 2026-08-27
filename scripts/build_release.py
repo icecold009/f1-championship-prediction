@@ -170,6 +170,7 @@ def build_release(
             "tier_evaluation_summary": "results/tier_rolling_origin_summary.csv",
             "tier_evaluation_details": "results/tier_rolling_origin_summary_details.csv",
             "tier_class_summary": "results/tier_rolling_origin_class_summary.csv",
+            "tier_confusion": "results/tier_rolling_origin_confusion.csv",
             "error_analysis_driver": "results/error_analysis_driver.csv",
             "error_analysis_season": "results/error_analysis_season_summary.csv",
             "error_analysis_group": "results/error_analysis_group_summary.csv",
