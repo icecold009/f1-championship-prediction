@@ -13,7 +13,18 @@ from sklearn.ensemble import (
     RandomForestRegressor,
 )
 from sklearn.linear_model import Ridge
-from sklearn.metrics import accuracy_score, confusion_matrix, f1_score, mean_squared_error, r2_score
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    f1_score,
+    mean_squared_error,
+    r2_score,
+)
+
+try:
+    from .data_pipeline import split_features
+except ImportError:  # Script entrypoints import src modules from the src path.
+    from data_pipeline import split_features
 
 logger = logging.getLogger(__name__)
 
@@ -317,10 +328,17 @@ def evaluate_tier_rolling_origin(
                 confusion_matrix(y_test, predictions, labels=TIER_LABELS).tolist()
             ),
             "actual_support_json": json.dumps(
-                y_test.value_counts().reindex(TIER_LABELS, fill_value=0).astype(int).to_dict()
+                y_test.value_counts()
+                .reindex(TIER_LABELS, fill_value=0)
+                .astype(int)
+                .to_dict()
             ),
             "predicted_support_json": json.dumps(
-                pd.Series(predictions).value_counts().reindex(TIER_LABELS, fill_value=0).astype(int).to_dict()
+                pd.Series(predictions)
+                .value_counts()
+                .reindex(TIER_LABELS, fill_value=0)
+                .astype(int)
+                .to_dict()
             ),
         }
         row.update(
@@ -351,15 +369,10 @@ def train_model(
         df["year"].max(),
     )
 
-    if forecast_year is None:
-        test_years = sorted(df["year"].unique())[-5:]
-        train_df = df[df["year"] < test_years[0]]
-        test_df = df[df["year"] >= test_years[0]]
-        forecast_label = f"latest five-season holdout beginning {test_years[0]}"
-    else:
-        train_df = df[df["year"] < forecast_year]
-        test_df = df[df["year"] == forecast_year]
-        forecast_label = f"forecast year {forecast_year}"
+    partition = split_features(df, forecast_year)
+    train_df = partition.train
+    test_df = partition.test
+    forecast_label = partition.label
     if train_df.empty:
         raise ValueError(f"No training seasons are available before {forecast_year}.")
 
