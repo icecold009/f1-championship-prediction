@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 from sklearn.ensemble import RandomForestRegressor
 
-from src import model, model_registry, predict
+from src import evaluation, model, model_registry, predict
 from src.model import (
     FEATURE_COLUMNS,
     NAIVE_BASELINE_NAME,
@@ -296,20 +296,17 @@ def test_tier_rolling_origin_keeps_test_seasons_after_training_cutoff(monkeypatc
             rows.append(row)
 
     classifier_configs = []
-    classifier_factory = model.RandomForestClassifier
+    classifier_factory = evaluation.create_tier_classifier
 
-    def record_classifier_config(*args, **kwargs):
+    def record_classifier_config(**kwargs):
         classifier_configs.append(kwargs.copy())
-        return classifier_factory(*args, **kwargs)
+        return classifier_factory(**kwargs)
 
-    monkeypatch.setattr(model, "RandomForestClassifier", record_classifier_config)
+    monkeypatch.setattr(evaluation, "create_tier_classifier", record_classifier_config)
     results = evaluate_tier_rolling_origin(
         pd.DataFrame(rows), test_seasons=2, min_train_seasons=3
     )
-    assert classifier_configs == [
-        {"n_estimators": 200, "max_depth": 8, "random_state": 42},
-        {"n_estimators": 200, "max_depth": 8, "random_state": 42},
-    ]
+    assert classifier_configs == [{"random_state": 42}, {"random_state": 42}]
     assert list(results.columns) == [
         "test_year",
         "train_end_year",
