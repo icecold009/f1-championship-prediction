@@ -1,18 +1,15 @@
 import json
 import logging
 import os
-import pickle
 from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 from sklearn.ensemble import (
-    GradientBoostingRegressor,
     RandomForestClassifier,
     RandomForestRegressor,
 )
-from sklearn.linear_model import Ridge
 from sklearn.metrics import (
     accuracy_score,
     confusion_matrix,
@@ -23,8 +20,28 @@ from sklearn.metrics import (
 
 try:
     from .data_pipeline import split_features
+    from .model_registry import (
+        COLD_START_FEATURE_COLUMNS,  # noqa: F401 - re-exported compatibility names.
+        FEATURE_COLUMNS,
+        HISTORY_FEATURE_COLUMNS,  # noqa: F401 - re-exported compatibility names.
+        create_bootstrap_regressor,
+        create_regression_candidates,
+        create_tier_classifier,
+        fit_model,
+        save_model_artifacts,
+    )
 except ImportError:  # Script entrypoints import src modules from the src path.
     from data_pipeline import split_features
+    from model_registry import (
+        COLD_START_FEATURE_COLUMNS,  # noqa: F401 - re-exported compatibility names.
+        FEATURE_COLUMNS,
+        HISTORY_FEATURE_COLUMNS,  # noqa: F401 - re-exported compatibility names.
+        create_bootstrap_regressor,
+        create_regression_candidates,
+        create_tier_classifier,
+        fit_model,
+        save_model_artifacts,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -33,29 +50,6 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROC_DIR = os.path.join(BASE_DIR, "data", "processed")
 MODEL_DIR = os.path.join(BASE_DIR, "models")
 os.makedirs(MODEL_DIR, exist_ok=True)
-
-HISTORY_FEATURE_COLUMNS = [
-    "prev_season_races_started",
-    "prev_season_avg_finish_pos",
-    "prev_season_std_finish_pos",
-    "prev_season_points_sum",
-    "prev_season_avg_grid_pos",
-    "prev_season_win_rate",
-    "prev_season_podium_rate",
-    "prev_season_dnf_rate",
-    "prev_season_points_per_race",
-    "prev_season_quali_to_race_delta",
-    "prev_season_sprint_points_sum",
-    "prev_team_final_points",
-    "prev_team_final_position",
-]
-COLD_START_FEATURE_COLUMNS = [
-    "is_rookie",
-    "returning_after_gap",
-    "missing_driver_history",
-    "missing_constructor_history",
-]
-FEATURE_COLUMNS = [*HISTORY_FEATURE_COLUMNS, *COLD_START_FEATURE_COLUMNS]
 
 TIER_LABELS = ["Champion", "Podium", "Top 5", "Top 10", "Midfield", "Backmarker"]
 ROLLING_ORIGIN_TEST_SEASONS = 10
@@ -90,21 +84,7 @@ def get_spearman(y_true: Iterable[float], y_pred: Iterable[float]) -> float:
 
 def _regression_candidates() -> dict[str, tuple[object, list[str]]]:
     """Create fresh estimators and their predeclared feature sets."""
-    return {
-        "Ridge": (Ridge(alpha=1.0), FEATURE_COLUMNS),
-        "Random Forest (history only)": (
-            RandomForestRegressor(n_estimators=200, max_depth=10, random_state=42),
-            HISTORY_FEATURE_COLUMNS,
-        ),
-        "Random Forest + cold-start flags": (
-            RandomForestRegressor(n_estimators=200, max_depth=10, random_state=42),
-            FEATURE_COLUMNS,
-        ),
-        "Gradient Boosting": (
-            GradientBoostingRegressor(n_estimators=200, max_depth=5, random_state=42),
-            FEATURE_COLUMNS,
-        ),
-    }
+    return create_regression_candidates()
 
 
 def previous_season_final_order(test_df: pd.DataFrame) -> pd.Series:
@@ -128,6 +108,7 @@ def bootstrap_position_predictions(
     n_bootstrap: int = 100,
     n_estimators: int = 200,
     random_state: int = 42,
+    rng: np.random.Generator | None = None,
 ) -> pd.DataFrame:
     """Estimate position uncertainty with season-level bootstrap models.
 
@@ -150,7 +131,7 @@ def bootstrap_position_predictions(
     if max(train_seasons) >= min(test_seasons):
         raise ValueError("Bootstrap training seasons must precede test seasons")
 
-    rng = np.random.default_rng(random_state)
+    random_source = rng if rng is not None else np.random.default_rng(random_state)
     X_test = test_df[FEATURE_COLUMNS].fillna(0)
     bootstrap_predictions = np.empty((n_bootstrap, len(test_df)), dtype=float)
 
@@ -158,18 +139,17 @@ def bootstrap_position_predictions(
         season: train_df[train_df["year"] == season] for season in train_seasons
     }
     for run in range(n_bootstrap):
-        sampled_seasons = rng.choice(
+        sampled_seasons = random_source.choice(
             train_seasons, size=len(train_seasons), replace=True
         )
         sampled_train = pd.concat(
             [season_rows[season] for season in sampled_seasons],
             ignore_index=True,
         )
-        model = RandomForestRegressor(
+        model = create_bootstrap_regressor(
             n_estimators=n_estimators,
-            max_depth=10,
             random_state=random_state + run,
-            n_jobs=-1,
+            factory=RandomForestRegressor,
         )
         model.fit(
             sampled_train[FEATURE_COLUMNS].fillna(0), sampled_train["champ_position"]
@@ -293,8 +273,9 @@ def evaluate_tier_rolling_origin(
     for test_year, train_df, test_df, train_years in _rolling_cutoffs(
         df, test_seasons, min_train_seasons
     ):
-        classifier = RandomForestClassifier(
-            n_estimators=200, max_depth=8, random_state=42
+        classifier = create_tier_classifier(
+            random_state=42,
+            factory=RandomForestClassifier,
         )
         X_train = train_df[FEATURE_COLUMNS].fillna(0)
         y_train = train_df["champ_position"].apply(assign_tier)
@@ -431,7 +412,7 @@ def train_model(
     best_name = "Random Forest + cold-start flags"
     best_model, operational_features = candidates[best_name]
     X_train = train_df[operational_features].fillna(0)
-    best_model.fit(X_train, y_train)  # type: ignore[attr-defined]
+    fit_model(best_model, X_train, y_train)  # type: ignore[arg-type]
     logger.info("\n  Operational forecast model: %s (predeclared)", best_name)
 
     if best_model is not None and hasattr(best_model, "feature_importances_"):
@@ -441,17 +422,11 @@ def train_model(
         logger.info("\n  Top 10 features:\n%s", imp.head(10).to_string())
 
     # ── Tier classifier for the user-facing forecast ───────────────────────
-    clf = RandomForestClassifier(n_estimators=200, max_depth=8, random_state=42)
-    clf.fit(X_train, yt_train)
+    clf = create_tier_classifier(random_state=42, factory=RandomForestClassifier)
+    fit_model(clf, X_train, yt_train)  # type: ignore[arg-type]
 
     # ── Save ──────────────────────────────────────────────────────────────
-    reg_path = os.path.join(MODEL_DIR, "championship_model.pkl")
-    clf_path = os.path.join(MODEL_DIR, "tier_classifier.pkl")
-
-    with open(reg_path, "wb") as f:
-        pickle.dump(best_model, f)
-    with open(clf_path, "wb") as f:
-        pickle.dump(clf, f)
+    reg_path, clf_path = save_model_artifacts(best_model, clf, MODEL_DIR)
 
     logger.info("\n  Saved regression model → %s", reg_path)
     logger.info("  Saved tier classifier  → %s", clf_path)

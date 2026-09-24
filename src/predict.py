@@ -1,6 +1,6 @@
 import logging
 import os
-import pickle
+from pickle import UnpicklingError
 from typing import Any
 
 import pandas as pd
@@ -10,6 +10,11 @@ try:
     from src.model import FEATURE_COLUMNS, bootstrap_position_predictions
 except ModuleNotFoundError:  # pragma: no cover - CLI path adds src directly
     from model import FEATURE_COLUMNS, bootstrap_position_predictions
+
+try:
+    from src.model_registry import load_model_artifacts, predict_model
+except ModuleNotFoundError:  # pragma: no cover - CLI path adds src directly
+    from model_registry import load_model_artifacts, predict_model
 
 logger = logging.getLogger(__name__)
 
@@ -26,22 +31,16 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 
 def load_models() -> tuple[Any, Any]:
     """Load the saved regression and tier-classification model artifacts."""
-    reg_path = os.path.join(MODEL_DIR, "championship_model.pkl")
-    clf_path = os.path.join(MODEL_DIR, "tier_classifier.pkl")
     try:
-        with open(reg_path, "rb") as f:
-            reg_model = pickle.load(f)
-        with open(clf_path, "rb") as f:
-            clf_model = pickle.load(f)
+        return load_model_artifacts(MODEL_DIR)
     except FileNotFoundError as exc:
         raise RuntimeError(
             "Saved models were not found. Run `python src/model.py` first."
         ) from exc
-    except (EOFError, OSError, pickle.UnpicklingError) as exc:
+    except (EOFError, OSError, UnpicklingError) as exc:
         raise RuntimeError(
             "Saved model artifacts could not be loaded. Run `python src/model.py` again."
         ) from exc
-    return reg_model, clf_model
 
 
 def predict_championship(year: int) -> pd.DataFrame | None:
@@ -80,8 +79,8 @@ def predict_championship(year: int) -> pd.DataFrame | None:
 
     # ── Predict with point model and season-level bootstrap uncertainty ───
     X = season_df[FEATURE_COLUMNS].fillna(0)
-    season_df["predicted_position"] = reg_model.predict(X)
-    season_df["predicted_tier"] = clf_model.predict(X)
+    season_df["predicted_position"] = predict_model(reg_model, X)
+    season_df["predicted_tier"] = predict_model(clf_model, X)
 
     train_df = df[df["year"] < year].dropna(subset=["champ_position"])
     uncertainty = bootstrap_position_predictions(

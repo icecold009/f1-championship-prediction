@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 from sklearn.ensemble import RandomForestRegressor
 
-from src import model, predict
+from src import model, model_registry, predict
 from src.model import (
     FEATURE_COLUMNS,
     NAIVE_BASELINE_NAME,
@@ -90,9 +90,18 @@ def test_bootstrap_position_predictions_returns_rank_probabilities_without_leaka
         n_estimators=3,
         random_state=42,
     )
+    injected_rng = bootstrap_position_predictions(
+        train_df,
+        test_df,
+        n_bootstrap=4,
+        n_estimators=3,
+        random_state=42,
+        rng=np.random.default_rng(42),
+    )
 
     assert len(uncertainty) == 2
     pd.testing.assert_frame_equal(uncertainty, repeated)
+    pd.testing.assert_frame_equal(uncertainty, injected_rng)
     assert uncertainty.index.tolist() == [8, 9]
     assert list(uncertainty.columns) == [
         "bootstrap_runs",
@@ -139,6 +148,62 @@ def test_bootstrap_position_predictions_returns_rank_probabilities_without_leaka
         "Random Forest + cold-start flags": 42,
         "Gradient Boosting": 42,
     }
+
+
+def test_model_registry_preserves_names_features_and_estimator_defaults():
+    candidates = model_registry.create_regression_candidates()
+
+    assert list(candidates) == [
+        "Ridge",
+        "Random Forest (history only)",
+        "Random Forest + cold-start flags",
+        "Gradient Boosting",
+    ]
+    assert candidates["Ridge"][0].get_params()["alpha"] == 1.0
+    assert candidates["Ridge"][1] is FEATURE_COLUMNS
+    history_model, history_columns = candidates["Random Forest (history only)"]
+    assert history_columns is model.HISTORY_FEATURE_COLUMNS
+    assert history_model.get_params()["n_estimators"] == 200
+    assert history_model.get_params()["max_depth"] == 10
+    assert history_model.get_params()["random_state"] == 42
+    operational_model, operational_columns = candidates[
+        "Random Forest + cold-start flags"
+    ]
+    assert operational_columns is FEATURE_COLUMNS
+    assert operational_model.get_params()["n_estimators"] == 200
+    assert operational_model.get_params()["max_depth"] == 10
+    assert operational_model.get_params()["random_state"] == 42
+    boosting, _ = candidates["Gradient Boosting"]
+    assert boosting.get_params()["n_estimators"] == 200
+    assert boosting.get_params()["max_depth"] == 5
+    assert boosting.get_params()["random_state"] == 42
+
+    tier = model_registry.create_tier_classifier()
+    assert tier.get_params()["n_estimators"] == 200
+    assert tier.get_params()["max_depth"] == 8
+    assert tier.get_params()["random_state"] == 42
+    bootstrap = model_registry.create_bootstrap_regressor(3, random_state=45)
+    assert bootstrap.get_params()["n_estimators"] == 3
+    assert bootstrap.get_params()["max_depth"] == 10
+    assert bootstrap.get_params()["random_state"] == 45
+    assert bootstrap.get_params()["n_jobs"] == -1
+
+
+def test_model_artifact_ports_round_trip_default_estimators(tmp_path):
+    regression = model_registry.create_regression_candidates()["Ridge"][0]
+    classifier = model_registry.create_tier_classifier()
+
+    paths = model_registry.save_model_artifacts(regression, classifier, tmp_path)
+    loaded_regression, loaded_classifier = model_registry.load_model_artifacts(tmp_path)
+
+    assert paths == (
+        tmp_path / "championship_model.pkl",
+        tmp_path / "tier_classifier.pkl",
+    )
+    assert type(loaded_regression) is type(regression)
+    assert type(loaded_classifier) is type(classifier)
+    assert loaded_regression.get_params() == regression.get_params()
+    assert loaded_classifier.get_params() == classifier.get_params()
 
 
 def test_rolling_origin_keeps_test_seasons_after_training_cutoff():
@@ -303,6 +368,14 @@ def test_load_models_reports_missing_artifacts(tmp_path, monkeypatch):
     monkeypatch.setattr(predict, "MODEL_DIR", str(tmp_path))
 
     with pytest.raises(RuntimeError, match="Run `python src/model.py` first"):
+        predict.load_models()
+
+
+def test_load_models_reports_corrupt_artifacts(tmp_path, monkeypatch):
+    monkeypatch.setattr(predict, "MODEL_DIR", str(tmp_path))
+    (tmp_path / "championship_model.pkl").write_bytes(b"not a pickle")
+
+    with pytest.raises(RuntimeError, match="could not be loaded"):
         predict.load_models()
 
 
