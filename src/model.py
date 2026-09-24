@@ -1,25 +1,21 @@
-import json
 import logging
 import os
-from collections.abc import Iterable
 
 import numpy as np
 import pandas as pd
-from scipy.stats import spearmanr
 from sklearn.ensemble import (
     RandomForestClassifier,
     RandomForestRegressor,
 )
-from sklearn.metrics import (
-    accuracy_score,
-    confusion_matrix,
-    f1_score,
-    mean_squared_error,
-    r2_score,
-)
 
 try:
+    from . import evaluation as _evaluation
     from .data_pipeline import split_features
+    from .evaluation import (
+        assign_tier,
+        evaluate_rolling_origin,
+        evaluate_tier_rolling_origin,
+    )
     from .model_registry import (
         COLD_START_FEATURE_COLUMNS,  # noqa: F401 - re-exported compatibility names.
         FEATURE_COLUMNS,
@@ -31,7 +27,13 @@ try:
         save_model_artifacts,
     )
 except ImportError:  # Script entrypoints import src modules from the src path.
+    import evaluation as _evaluation
     from data_pipeline import split_features
+    from evaluation import (
+        assign_tier,
+        evaluate_rolling_origin,
+        evaluate_tier_rolling_origin,
+    )
     from model_registry import (
         COLD_START_FEATURE_COLUMNS,  # noqa: F401 - re-exported compatibility names.
         FEATURE_COLUMNS,
@@ -43,6 +45,16 @@ except ImportError:  # Script entrypoints import src modules from the src path.
         save_model_artifacts,
     )
 
+TIER_LABELS = _evaluation.TIER_LABELS
+ROLLING_ORIGIN_TEST_SEASONS = _evaluation.ROLLING_ORIGIN_TEST_SEASONS
+NAIVE_BASELINE_NAME = _evaluation.NAIVE_BASELINE_NAME
+_rolling_cutoffs = _evaluation._rolling_cutoffs
+get_spearman = _evaluation.get_spearman
+previous_season_final_order = _evaluation.previous_season_final_order
+evaluate_rolling_origin_with_failures = (
+    _evaluation.evaluate_rolling_origin_with_failures
+)
+
 logger = logging.getLogger(__name__)
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
@@ -51,55 +63,10 @@ PROC_DIR = os.path.join(BASE_DIR, "data", "processed")
 MODEL_DIR = os.path.join(BASE_DIR, "models")
 os.makedirs(MODEL_DIR, exist_ok=True)
 
-TIER_LABELS = ["Champion", "Podium", "Top 5", "Top 10", "Midfield", "Backmarker"]
-ROLLING_ORIGIN_TEST_SEASONS = 10
-NAIVE_BASELINE_NAME = "Naive: previous-season final order"
-
-
-def assign_tier(pos: float | int | None) -> str:
-    """Map a championship position to its reporting tier."""
-    if pd.isna(pos):
-        return "Unknown"
-    p = int(pos)
-    # These bands mirror the project’s reporting categories: champion, podium, top 5, top 10, midfield, backmarker.
-    if p == 1:
-        return "Champion"
-    elif p <= 3:
-        return "Podium"
-    elif p <= 5:
-        return "Top 5"
-    elif p <= 10:
-        return "Top 10"
-    elif p <= 15:
-        return "Midfield"
-    else:
-        return "Backmarker"
-
-
-def get_spearman(y_true: Iterable[float], y_pred: Iterable[float]) -> float:
-    """Return the Spearman rank correlation for true and predicted values."""
-    corr_val, _ = spearmanr(y_true, y_pred)
-    return float(corr_val)  # type: ignore
-
 
 def _regression_candidates() -> dict[str, tuple[object, list[str]]]:
     """Create fresh estimators and their predeclared feature sets."""
     return create_regression_candidates()
-
-
-def previous_season_final_order(test_df: pd.DataFrame) -> pd.Series:
-    """Predict current order by ranking entrants on prior-season total points.
-
-    This is a deliberately simple pre-season baseline. Drivers without a
-    prior-season record receive zero points, sprint points are included, and
-    ties use source-row order.
-    """
-    previous_points = test_df["prev_season_points_sum"].fillna(0)
-    if "prev_season_sprint_points_sum" in test_df:
-        previous_points = previous_points + test_df[
-            "prev_season_sprint_points_sum"
-        ].fillna(0)
-    return previous_points.rank(method="first", ascending=False)
 
 
 def bootstrap_position_predictions(
@@ -196,143 +163,6 @@ def _rolling_cutoffs(
     return cutoffs
 
 
-def evaluate_rolling_origin(
-    df: pd.DataFrame,
-    test_seasons: int = ROLLING_ORIGIN_TEST_SEASONS,
-    min_train_seasons: int = 20,
-) -> pd.DataFrame:
-    """Evaluate models and historical baselines on successive future seasons.
-
-    For each test season, models train only on earlier seasons. The returned
-    rows retain the train cutoff so the evaluation is auditable and cannot
-    silently become a random split.
-    """
-    rows: list[dict[str, float | int | str]] = []
-
-    for test_year, train_df, test_df, train_years in _rolling_cutoffs(
-        df, test_seasons, min_train_seasons
-    ):
-        y_train = train_df["champ_position"]
-        y_test = test_df["champ_position"]
-
-        naive_predictions = previous_season_final_order(test_df)
-        naive_spearman = get_spearman(y_test, naive_predictions)
-        baseline_predictions = {
-            NAIVE_BASELINE_NAME: naive_predictions,
-            "Baseline: previous avg finish": test_df[
-                "prev_season_avg_finish_pos"
-            ].fillna(y_train.median()),
-        }
-        for name, predictions in baseline_predictions.items():
-            spearman = get_spearman(y_test, predictions)
-            rows.append(
-                {
-                    "test_year": test_year,
-                    "train_end_year": train_years[-1],
-                    "model": name,
-                    "rmse": float(np.sqrt(mean_squared_error(y_test, predictions))),
-                    "r2": float(r2_score(y_test, predictions)),
-                    "spearman": spearman,
-                    "spearman_delta_vs_naive": spearman - naive_spearman,
-                }
-            )
-
-        for name, (model, feature_columns) in _regression_candidates().items():
-            X_train = train_df[feature_columns].fillna(0)
-            X_test = test_df[feature_columns].fillna(0)
-            model.fit(X_train, y_train)  # type: ignore[attr-defined]
-            predictions = model.predict(X_test)  # type: ignore[attr-defined]
-            spearman = get_spearman(y_test, predictions)
-            rows.append(
-                {
-                    "test_year": test_year,
-                    "train_end_year": train_years[-1],
-                    "model": name,
-                    "rmse": float(np.sqrt(mean_squared_error(y_test, predictions))),
-                    "r2": float(r2_score(y_test, predictions)),
-                    "spearman": spearman,
-                    "spearman_delta_vs_naive": spearman - naive_spearman,
-                }
-            )
-
-    return pd.DataFrame(rows)
-
-
-def evaluate_tier_rolling_origin(
-    df: pd.DataFrame,
-    test_seasons: int = ROLLING_ORIGIN_TEST_SEASONS,
-    min_train_seasons: int = 20,
-) -> pd.DataFrame:
-    """Evaluate tier classification on successive future seasons.
-
-    Each row is scored only after a classifier trained on strictly earlier
-    seasons. The six class F1 values are retained for transparent reporting.
-    """
-    rows: list[dict[str, float | int | str]] = []
-
-    for test_year, train_df, test_df, train_years in _rolling_cutoffs(
-        df, test_seasons, min_train_seasons
-    ):
-        classifier = create_tier_classifier(
-            random_state=42,
-            factory=RandomForestClassifier,
-        )
-        X_train = train_df[FEATURE_COLUMNS].fillna(0)
-        y_train = train_df["champ_position"].apply(assign_tier)
-        X_test = test_df[FEATURE_COLUMNS].fillna(0)
-        y_test = test_df["champ_position"].apply(assign_tier)
-
-        classifier.fit(X_train, y_train)
-        predictions = classifier.predict(X_test)
-        class_f1 = f1_score(
-            y_test,
-            predictions,
-            labels=TIER_LABELS,
-            average=None,
-            zero_division=0,
-        )
-        row: dict[str, float | int | str] = {
-            "test_year": test_year,
-            "train_end_year": train_years[-1],
-            "model": "Random Forest",
-            "accuracy": float(accuracy_score(y_test, predictions)),
-            "macro_f1": float(
-                f1_score(
-                    y_test,
-                    predictions,
-                    labels=TIER_LABELS,
-                    average="macro",
-                    zero_division=0,
-                )
-            ),
-            "confusion_matrix_json": json.dumps(
-                confusion_matrix(y_test, predictions, labels=TIER_LABELS).tolist()
-            ),
-            "actual_support_json": json.dumps(
-                y_test.value_counts()
-                .reindex(TIER_LABELS, fill_value=0)
-                .astype(int)
-                .to_dict()
-            ),
-            "predicted_support_json": json.dumps(
-                pd.Series(predictions)
-                .value_counts()
-                .reindex(TIER_LABELS, fill_value=0)
-                .astype(int)
-                .to_dict()
-            ),
-        }
-        row.update(
-            {
-                f"f1_{tier.lower().replace(' ', '_')}": float(score)
-                for tier, score in zip(TIER_LABELS, class_f1, strict=False)
-            }
-        )
-        rows.append(row)
-
-    return pd.DataFrame(rows)
-
-
 def train_model(
     forecast_year: int | None = None,
     skip_rolling_evaluation: bool = False,
@@ -375,6 +205,9 @@ def train_model(
     if not skip_rolling_evaluation:
         # ── Leak-free rolling-origin metrics ──────────────────────────────
         rolling_results = evaluate_rolling_origin(df)
+        failures = rolling_results.attrs.get("failures")
+        if failures is not None and not failures.empty:
+            logger.warning("%s rolling-origin model folds failed", len(failures))
         logger.info(
             "\n── Rolling-origin backtest (%s seasons; baselines included) ───",
             rolling_results["test_year"].nunique(),
