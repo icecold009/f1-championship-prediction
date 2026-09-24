@@ -1,3 +1,4 @@
+import hashlib
 from unittest.mock import Mock
 
 import numpy as np
@@ -73,17 +74,71 @@ def test_bootstrap_position_predictions_returns_rank_probabilities_without_leaka
             rows.append(row)
     frame = pd.DataFrame(rows)
 
+    train_df = frame[frame["year"] < 2014]
+    test_df = frame[frame["year"] == 2014]
     uncertainty = bootstrap_position_predictions(
-        frame[frame["year"] < 2014],
-        frame[frame["year"] == 2014],
+        train_df,
+        test_df,
         n_bootstrap=4,
         n_estimators=3,
+        random_state=42,
+    )
+    repeated = bootstrap_position_predictions(
+        train_df,
+        test_df,
+        n_bootstrap=4,
+        n_estimators=3,
+        random_state=42,
     )
 
     assert len(uncertainty) == 2
+    pd.testing.assert_frame_equal(uncertainty, repeated)
+    assert uncertainty.index.tolist() == [8, 9]
+    assert list(uncertainty.columns) == [
+        "bootstrap_runs",
+        "bootstrap_position_mean",
+        "bootstrap_position_sd",
+        "bootstrap_position_p05",
+        "bootstrap_position_p95",
+        "champion_probability",
+        "top_3_probability",
+        "top_5_probability",
+    ]
+    assert dict(
+        zip(uncertainty.columns, uncertainty.dtypes.astype(str), strict=True)
+    ) == {
+        "bootstrap_runs": "int64",
+        "bootstrap_position_mean": "float64",
+        "bootstrap_position_sd": "float64",
+        "bootstrap_position_p05": "float64",
+        "bootstrap_position_p95": "float64",
+        "champion_probability": "float64",
+        "top_3_probability": "float64",
+        "top_5_probability": "float64",
+    }
     assert (uncertainty["bootstrap_runs"] == 4).all()
     assert uncertainty["champion_probability"].sum() == pytest.approx(1.0)
     assert uncertainty["top_3_probability"].sum() == pytest.approx(2.0)
+    uncertainty_digest = hashlib.sha256(
+        uncertainty.to_csv(
+            index=False, float_format="%.17g", lineterminator="\n"
+        ).encode("utf-8")
+    ).hexdigest()
+    assert (
+        uncertainty_digest
+        == "3ba1a53177c295f8a46fc5861b9d5e00f0b88dcf570804c240c5e9bfdf92684c"
+    )
+
+    estimator_seeds = {
+        name: getattr(estimator, "random_state", None)
+        for name, (estimator, _) in model._regression_candidates().items()
+    }
+    assert estimator_seeds == {
+        "Ridge": None,
+        "Random Forest (history only)": 42,
+        "Random Forest + cold-start flags": 42,
+        "Gradient Boosting": 42,
+    }
 
 
 def test_rolling_origin_keeps_test_seasons_after_training_cutoff():
@@ -103,7 +158,53 @@ def test_rolling_origin_keeps_test_seasons_after_training_cutoff():
     results = evaluate_rolling_origin(
         pd.DataFrame(rows), test_seasons=2, min_train_seasons=3
     )
+    expected_models = [
+        NAIVE_BASELINE_NAME,
+        "Baseline: previous avg finish",
+        "Ridge",
+        "Random Forest (history only)",
+        "Random Forest + cold-start flags",
+        "Gradient Boosting",
+    ]
 
+    assert list(results.columns) == [
+        "test_year",
+        "train_end_year",
+        "model",
+        "rmse",
+        "r2",
+        "spearman",
+        "spearman_delta_vs_naive",
+    ]
+    assert list(
+        zip(
+            results["train_end_year"],
+            results["test_year"],
+            results["model"],
+            strict=True,
+        )
+    ) == [
+        *((2013, 2014, name) for name in expected_models),
+        *((2014, 2015, name) for name in expected_models),
+    ]
+    assert dict(zip(results.columns, results.dtypes.astype(str), strict=True)) == {
+        "test_year": "int64",
+        "train_end_year": "int64",
+        "model": "str",
+        "rmse": "float64",
+        "r2": "float64",
+        "spearman": "float64",
+        "spearman_delta_vs_naive": "float64",
+    }
+    metric_digest = hashlib.sha256(
+        results.to_csv(index=False, float_format="%.17g", lineterminator="\n").encode(
+            "utf-8"
+        )
+    ).hexdigest()
+    assert (
+        metric_digest
+        == "4e67683122b74eae5f2e0f9ef15d2f07a4ef95313efecfef88b57976a1791e9d"
+    )
     assert set(results["test_year"]) == {2014, 2015}
     assert (results["train_end_year"] < results["test_year"]).all()
     assert set(results["model"]) == {
@@ -116,7 +217,7 @@ def test_rolling_origin_keeps_test_seasons_after_training_cutoff():
     }
 
 
-def test_tier_rolling_origin_keeps_test_seasons_after_training_cutoff():
+def test_tier_rolling_origin_keeps_test_seasons_after_training_cutoff(monkeypatch):
     rows = []
     positions = [1, 3, 5, 10, 15, 16]
     for year in range(2010, 2016):
@@ -129,10 +230,68 @@ def test_tier_rolling_origin_keeps_test_seasons_after_training_cutoff():
             row.update({column: float(driver_id) for column in FEATURE_COLUMNS})
             rows.append(row)
 
+    classifier_configs = []
+    classifier_factory = model.RandomForestClassifier
+
+    def record_classifier_config(*args, **kwargs):
+        classifier_configs.append(kwargs.copy())
+        return classifier_factory(*args, **kwargs)
+
+    monkeypatch.setattr(model, "RandomForestClassifier", record_classifier_config)
     results = evaluate_tier_rolling_origin(
         pd.DataFrame(rows), test_seasons=2, min_train_seasons=3
     )
+    assert classifier_configs == [
+        {"n_estimators": 200, "max_depth": 8, "random_state": 42},
+        {"n_estimators": 200, "max_depth": 8, "random_state": 42},
+    ]
+    assert list(results.columns) == [
+        "test_year",
+        "train_end_year",
+        "model",
+        "accuracy",
+        "macro_f1",
+        "confusion_matrix_json",
+        "actual_support_json",
+        "predicted_support_json",
+        "f1_champion",
+        "f1_podium",
+        "f1_top_5",
+        "f1_top_10",
+        "f1_midfield",
+        "f1_backmarker",
+    ]
+    assert list(zip(results["train_end_year"], results["test_year"], strict=True)) == [
+        (2013, 2014),
+        (2014, 2015),
+    ]
+    assert results["model"].tolist() == ["Random Forest", "Random Forest"]
 
+    assert dict(zip(results.columns, results.dtypes.astype(str), strict=True)) == {
+        "test_year": "int64",
+        "train_end_year": "int64",
+        "model": "str",
+        "accuracy": "float64",
+        "macro_f1": "float64",
+        "confusion_matrix_json": "str",
+        "actual_support_json": "str",
+        "predicted_support_json": "str",
+        "f1_champion": "float64",
+        "f1_podium": "float64",
+        "f1_top_5": "float64",
+        "f1_top_10": "float64",
+        "f1_midfield": "float64",
+        "f1_backmarker": "float64",
+    }
+    tier_metric_digest = hashlib.sha256(
+        results.to_csv(index=False, float_format="%.17g", lineterminator="\n").encode(
+            "utf-8"
+        )
+    ).hexdigest()
+    assert (
+        tier_metric_digest
+        == "e54d782a42115d9f58c1cb1323fc80a8bb823bbb6145bbc90587f46919bb0109"
+    )
     assert set(results["test_year"]) == {2014, 2015}
     assert (results["train_end_year"] < results["test_year"]).all()
     assert {"accuracy", "macro_f1", "f1_champion", "f1_backmarker"}.issubset(

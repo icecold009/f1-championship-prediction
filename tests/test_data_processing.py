@@ -1,3 +1,5 @@
+import hashlib
+
 import pandas as pd
 
 from src import data_processing
@@ -120,6 +122,73 @@ def test_create_features_uses_prior_season_only(tmp_path, monkeypatch):
         empty_sprints,
         empty_pit_stops,
     )
+
+    assert list(features.columns) == [
+        "year",
+        "driverId",
+        "constructorId",
+        "driverRef",
+        "constructorRef",
+        "prev_season_races_started",
+        "prev_season_avg_finish_pos",
+        "prev_season_std_finish_pos",
+        "prev_season_points_sum",
+        "prev_season_avg_grid_pos",
+        "prev_season_win_rate",
+        "prev_season_podium_rate",
+        "prev_season_dnf_rate",
+        "prev_season_points_per_race",
+        "prev_season_quali_to_race_delta",
+        "prev_season_sprint_points_sum",
+        "is_rookie",
+        "returning_after_gap",
+        "missing_driver_history",
+        "prev_team_final_points",
+        "prev_team_final_position",
+        "missing_constructor_history",
+        "champ_position",
+        "champ_points",
+    ]
+    assert list(zip(features["year"], features["driverId"], strict=True)) == [
+        (2019, 10),
+        (2019, 20),
+        (2020, 10),
+        (2020, 20),
+    ]
+    features_path = tmp_path / "features.csv"
+    features_bytes = features_path.read_bytes().replace(b"\r\n", b"\n")
+    features_digest = hashlib.sha256(features_bytes).hexdigest()
+    assert (
+        features_digest
+        == "3052060ff6736548960aa81f9820efea72142b10818f2fc56cc6ac18980bf610"
+    )
+
+    assert dict(zip(features.columns, features.dtypes.astype(str), strict=True)) == {
+        "year": "int64",
+        "driverId": "int64",
+        "constructorId": "int64",
+        "driverRef": "str",
+        "constructorRef": "str",
+        "prev_season_races_started": "float64",
+        "prev_season_avg_finish_pos": "float64",
+        "prev_season_std_finish_pos": "float64",
+        "prev_season_points_sum": "float64",
+        "prev_season_avg_grid_pos": "float64",
+        "prev_season_win_rate": "float64",
+        "prev_season_podium_rate": "float64",
+        "prev_season_dnf_rate": "float64",
+        "prev_season_points_per_race": "float64",
+        "prev_season_quali_to_race_delta": "float64",
+        "prev_season_sprint_points_sum": "float64",
+        "is_rookie": "int64",
+        "returning_after_gap": "int64",
+        "missing_driver_history": "int64",
+        "prev_team_final_points": "float64",
+        "prev_team_final_position": "float64",
+        "missing_constructor_history": "int64",
+        "champ_position": "int64",
+        "champ_points": "float64",
+    }
 
     current = features[features["year"] == 2020].sort_values("driverId")
     assert len(features) == 4
