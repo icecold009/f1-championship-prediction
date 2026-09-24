@@ -68,7 +68,11 @@ def test_prediction_pipeline_uses_canonical_features_and_writes_output(
         lambda: (_ConstantModel([1.2, 2.4]), _ConstantModel(["Champion", "Podium"])),
     )
 
-    def fake_uncertainty(train_df, test_df, **_):
+    uncertainty_calls = []
+
+    def fake_uncertainty(train_df, test_df, **kwargs):
+        uncertainty_calls.append(kwargs.copy())
+        assert kwargs["random_state"] == 42
         assert train_df["year"].max() < test_df["year"].min()
         return pd.DataFrame(
             {
@@ -88,7 +92,60 @@ def test_prediction_pipeline_uses_canonical_features_and_writes_output(
 
     assert output is not None
     assert output["Driver"].tolist() == ["Driver One", "Driver Two"]
-    assert (results_dir / "2023_predictions.csv").exists()
+    assert list(output.columns) == [
+        "Predicted Rank",
+        "Driver",
+        "Team",
+        "Predicted Tier",
+        "Predicted Position",
+        "Actual Position",
+        "Actual Points",
+        "Bootstrap Runs",
+        "Bootstrap Position Mean",
+        "Bootstrap Position SD",
+        "Bootstrap Position P05",
+        "Bootstrap Position P95",
+        "Champion Probability",
+        "Top 3 Probability",
+        "Top 5 Probability",
+    ]
+    assert dict(zip(output.columns, output.dtypes.astype(str), strict=True)) == {
+        "Predicted Rank": "int64",
+        "Driver": "str",
+        "Team": "str",
+        "Predicted Tier": "str",
+        "Predicted Position": "float64",
+        "Actual Position": "int64",
+        "Actual Points": "int64",
+        "Bootstrap Runs": "int64",
+        "Bootstrap Position Mean": "float64",
+        "Bootstrap Position SD": "float64",
+        "Bootstrap Position P05": "float64",
+        "Bootstrap Position P95": "float64",
+        "Champion Probability": "float64",
+        "Top 3 Probability": "float64",
+        "Top 5 Probability": "float64",
+    }
+    assert output["Predicted Rank"].tolist() == [1, 2]
+    for column in (
+        "Champion Probability",
+        "Top 3 Probability",
+        "Top 5 Probability",
+    ):
+        assert output[column].between(0, 1).all()
+
+    prediction_path = results_dir / "2023_predictions.csv"
+    first_csv = prediction_path.read_bytes()
+    first_digest = hashlib.sha256(first_csv.replace(b"\r\n", b"\n")).hexdigest()
+    assert (
+        first_digest
+        == "40bff07b4856ade3d78fa9ffe8366073562f5fa960425b26cd12a701cf52915b"
+    )
+    repeated = predict.predict_championship(2023)
+    pd.testing.assert_frame_equal(output, repeated)
+    assert prediction_path.read_bytes() == first_csv
+    assert len(uncertainty_calls) == 2
+    assert all(call["random_state"] == 42 for call in uncertainty_calls)
 
 
 def test_visualisation_writes_reviewer_chart(tmp_path, monkeypatch):
@@ -116,7 +173,9 @@ def test_visualisation_reports_missing_prediction(tmp_path, monkeypatch):
 
 def test_raw_schema_and_hash_provenance(tmp_path):
     for filename, columns in REQUIRED_COLUMNS.items():
-        pd.DataFrame(columns=sorted(columns)).to_csv(tmp_path / filename, index=False)
+        pd.DataFrame(columns=sorted(columns)).to_csv(
+            tmp_path / filename, index=False, lineterminator="\n"
+        )
     # Tables not consumed by feature engineering still belong in provenance.
     from scripts.download_data import REQUIRED_FILES
 
@@ -131,6 +190,11 @@ def test_raw_schema_and_hash_provenance(tmp_path):
     assert set(provenance) == set(REQUIRED_FILES)
     sample = tmp_path / "races.csv"
     assert sha256_file(sample) == hashlib.sha256(sample.read_bytes()).hexdigest()
+    assert set(provenance["races.csv"]) == {"sha256", "bytes"}
+    assert provenance["races.csv"] == {
+        "sha256": "4fd307c59dbfde92dff1a913f8826391558d1f4608e0d8c8664c204ef0c91bc3",
+        "bytes": 18,
+    }
 
 
 def test_raw_schema_reports_missing_required_column(tmp_path):

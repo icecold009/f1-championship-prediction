@@ -1,3 +1,5 @@
+import hashlib
+
 import pandas as pd
 
 from src import report
@@ -73,3 +75,21 @@ def test_create_report_renders_prediction_summary(tmp_path, monkeypatch):
     assert "Paired comparison with the naïve baseline" in contents
     assert "Uncertainty calibration" in contents
     assert "Held-out permutation importance" in contents
+    assert [line.strip() for line in contents.splitlines() if "<h2>" in line] == [
+        "<h2>Predicted versus actual</h2>",
+        "<h2>Rolling-origin evaluation</h2>",
+        "<h2>Tier classification</h2>",
+        "<h2>Where this model breaks</h2>",
+        "<h2>Bootstrap uncertainty</h2>",
+        "<h2>Uncertainty calibration</h2>",
+        "<h2>Held-out permutation importance</h2>",
+        "<h2>Predicted order</h2>",
+    ]
+    first_report = output_path.read_bytes()
+    report_digest = hashlib.sha256(first_report.replace(b"\r\n", b"\n")).hexdigest()
+    assert (
+        report_digest
+        == "c1d615e73c223b0e354736398f39e778229f50c38d57da6e8e4abfb8a686469b"
+    )
+    report.create_report(2023)
+    assert output_path.read_bytes() == first_report
