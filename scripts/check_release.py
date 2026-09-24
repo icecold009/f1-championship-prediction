@@ -5,66 +5,39 @@ import hashlib
 import json
 import logging
 import subprocess
+import sys
 from pathlib import Path
 
 import pandas as pd
 
 BASE_DIR = Path(__file__).resolve().parents[1]
-RAW_FILES = (
-    "circuits.csv",
-    "constructor_results.csv",
-    "constructor_standings.csv",
-    "constructors.csv",
-    "driver_standings.csv",
-    "drivers.csv",
-    "lap_times.csv",
-    "pit_stops.csv",
-    "qualifying.csv",
-    "races.csv",
-    "results.csv",
-    "seasons.csv",
-    "sprint_results.csv",
-    "status.csv",
+sys.path.insert(0, str(BASE_DIR))
+
+from src.release_policy import (
+    AUDIT_ARTIFACT_KEYS,
+    AUDIT_RELEASE_FILES,
+    CORE_RELEASE_FILES,
+    RAW_FILES,
+    RELEASE_SOURCE_PATHS,
+    normalise_artifact_path,
+    required_release_artifacts,
+    validate_artifact_manifest_policy,
+    validate_feature_frame,
+    validate_manifest_policy,
+    validate_prediction_frame,
+    validate_raw_data_manifest,
+    validate_release_raw_manifest,
 )
-CORE_RELEASE_FILES = (
-    "predicted_vs_actual_{year}.png",
-    "f1_prediction_report_{year}.html",
-    "rolling_origin_summary.csv",
-    "rolling_origin_summary_details.csv",
-    "tier_rolling_origin_summary.csv",
-    "tier_rolling_origin_summary_details.csv",
-    "tier_rolling_origin_class_summary.csv",
-    "error_analysis_driver.csv",
-    "error_analysis_season_summary.csv",
-    "error_analysis_group_summary.csv",
-    "model_vs_naive_summary.csv",
-    "model_vs_naive_by_season.png",
-    "release_manifest.json",
-)
-AUDIT_RELEASE_FILES = (
-    "uncertainty_calibration_driver.csv",
-    "uncertainty_calibration_summary.csv",
-    "uncertainty_calibration_bins.csv",
-    "permutation_importance_details.csv",
-    "permutation_importance_summary.csv",
-)
-AUDIT_ARTIFACT_KEYS = {
-    "uncertainty_calibration_driver.csv": "uncertainty_calibration_details",
-    "uncertainty_calibration_summary.csv": "uncertainty_calibration_summary",
-    "uncertainty_calibration_bins.csv": "uncertainty_calibration_bins",
-    "permutation_importance_details.csv": "permutation_importance_details",
-    "permutation_importance_summary.csv": "permutation_importance_summary",
-}
-RELEASE_SOURCE_PATHS = (
-    ".github",
-    "main.py",
-    "pyproject.toml",
-    "requirements.txt",
-    "requirements-dev.txt",
-    "scripts",
-    "src",
-)
+
 logger = logging.getLogger(__name__)
+__all__ = [
+    "AUDIT_ARTIFACT_KEYS",
+    "AUDIT_RELEASE_FILES",
+    "CORE_RELEASE_FILES",
+    "RAW_FILES",
+    "RELEASE_SOURCE_PATHS",
+    "validate_release",
+]
 
 
 def _sha256(path: Path) -> str:
@@ -90,7 +63,7 @@ def _git_commit(base_dir: Path) -> str | None:
 
 
 def _normalise_artifact_path(value: object) -> str:
-    return str(value).replace("\\", "/")
+    return normalise_artifact_path(value)
 
 
 def _source_changed_since(base_dir: Path, commit: str) -> bool:
@@ -141,13 +114,10 @@ def validate_release(
         except (json.JSONDecodeError, OSError, TypeError) as exc:
             errors.append(f"Invalid release manifest: {exc}")
 
-    manifest_audit = release_manifest.get("full_audit")
-    if require_full_audit is None:
-        require_full_audit = manifest_audit is not False
-    if require_full_audit and manifest_audit is not True:
-        errors.append("Release manifest does not record a completed full audit")
-    if release_manifest and release_manifest.get("prediction_year") != year:
-        errors.append("Release manifest prediction year does not match requested year")
+    require_full_audit, policy_errors = validate_manifest_policy(
+        release_manifest, year, require_full_audit
+    )
+    errors.extend(policy_errors)
 
     current_commit = _git_commit(base_dir)
     manifest_commit = release_manifest.get("git_commit")
@@ -172,49 +142,21 @@ def validate_release(
             "Missing raw-data provenance manifest: data/raw/data_manifest.json"
         )
     elif not missing_raw:
+        actual_raw_files = {
+            filename: {
+                "sha256": _sha256(raw_dir / filename),
+                "bytes": (raw_dir / filename).stat().st_size,
+            }
+            for filename in RAW_FILES
+        }
         try:
             data_manifest = json.loads(data_manifest_path.read_text(encoding="utf-8"))
             if not isinstance(data_manifest, dict):
                 raise TypeError("manifest root must be an object")
-            recorded_files = data_manifest.get("files", {})
-            if not isinstance(recorded_files, dict):
-                raise TypeError("files must be an object")
-            for filename in RAW_FILES:
-                recorded_entry = recorded_files.get(filename, {})
-                if not isinstance(recorded_entry, dict):
-                    recorded_entry = {}
-                recorded_hash = recorded_entry.get("sha256")
-                if not recorded_hash:
-                    errors.append(f"Raw-data manifest missing hash for {filename}")
-                elif recorded_hash != _sha256(raw_dir / filename):
-                    errors.append(f"Raw-data checksum mismatch: {filename}")
-                recorded_bytes = recorded_entry.get("bytes")
-                if (
-                    recorded_bytes is not None
-                    and recorded_bytes != (raw_dir / filename).stat().st_size
-                ):
-                    errors.append(f"Raw-data byte-size mismatch: {filename}")
-            archive_sha256 = data_manifest.get("archive_sha256")
-            if archive_sha256 in (None, "unknown"):
-                errors.append("Raw-data manifest lacks an immutable archive SHA-256")
+            errors.extend(validate_raw_data_manifest(data_manifest, actual_raw_files))
         except (json.JSONDecodeError, OSError, TypeError) as exc:
             errors.append(f"Invalid raw-data provenance manifest: {exc}")
-
-        release_data = release_manifest.get("data", {})
-        release_raw_files = (
-            release_data.get("raw_files", {}) if isinstance(release_data, dict) else {}
-        )
-        if not isinstance(release_raw_files, dict):
-            errors.append("Release manifest raw_files must be an object")
-        else:
-            for filename in RAW_FILES:
-                expected = release_raw_files.get(filename, {})
-                if not isinstance(expected, dict):
-                    expected = {}
-                if expected.get("sha256") != _sha256(raw_dir / filename):
-                    errors.append(f"Release manifest checksum mismatch: {filename}")
-                if expected.get("bytes") != (raw_dir / filename).stat().st_size:
-                    errors.append(f"Release manifest byte-size mismatch: {filename}")
+        errors.extend(validate_release_raw_manifest(release_manifest, actual_raw_files))
 
     features_path = processed_dir / "features.csv"
     if not features_path.exists():
@@ -225,31 +167,7 @@ def validate_release(
         except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError) as exc:
             errors.append(f"Invalid processed features: {exc}")
             features = pd.DataFrame()
-        required_features = {"year", "driverId", "champ_position"}
-        missing_features = sorted(required_features - set(features.columns))
-        if missing_features:
-            errors.append(
-                f"Processed features missing columns: {', '.join(missing_features)}"
-            )
-        if features.empty:
-            errors.append("Processed features are empty")
-        elif "champ_position" in features.columns:
-            missing_target_years = set(
-                pd.to_numeric(
-                    features.loc[features["champ_position"].isna(), "year"],
-                    errors="coerce",
-                )
-                .dropna()
-                .astype(int)
-            )
-            latest_year = int(pd.to_numeric(features["year"], errors="coerce").max())
-            if missing_target_years - {latest_year}:
-                errors.append(
-                    "Processed features have missing championship targets before "
-                    "the latest season"
-                )
-            if features.duplicated(["year", "driverId"]).any():
-                errors.append("Processed features contain duplicate driver-season rows")
+        errors.extend(validate_feature_frame(features))
 
     for filename in ("championship_model.pkl", "tier_classifier.pkl"):
         model_path = models_dir / filename
@@ -267,79 +185,17 @@ def validate_release(
         except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError) as exc:
             errors.append(f"Invalid prediction artifact: {exc}")
             predictions = pd.DataFrame()
-        required_prediction_columns = {
-            "Predicted Rank",
-            "Driver",
-            "Predicted Position",
-            "Bootstrap Runs",
-            "Bootstrap Position SD",
-            "Bootstrap Position P05",
-            "Bootstrap Position P95",
-            "Champion Probability",
-            "Top 3 Probability",
-            "Top 5 Probability",
-        }
-        missing_prediction_columns = sorted(
-            required_prediction_columns - set(predictions.columns)
-        )
-        if missing_prediction_columns:
-            errors.append(
-                "Prediction artifact missing columns: "
-                + ", ".join(missing_prediction_columns)
-            )
-        if predictions.empty:
-            errors.append("Prediction artifact is empty")
-        elif not missing_prediction_columns:
-            ranks = predictions["Predicted Rank"]
-            numeric_ranks = pd.to_numeric(ranks, errors="coerce")
-            expected_ranks = list(range(1, len(predictions) + 1))
-            if (
-                numeric_ranks.isna().any()
-                or not numeric_ranks.eq(numeric_ranks.astype("Int64")).all()
-                or not numeric_ranks.is_unique
-                or numeric_ranks.astype(int).tolist() != expected_ranks
-            ):
-                errors.append("Prediction ranks are not a complete ordered sequence")
-            for column in (
-                "Champion Probability",
-                "Top 3 Probability",
-                "Top 5 Probability",
-            ):
-                values = pd.to_numeric(predictions[column], errors="coerce")
-                if values.isna().any() or not values.between(0, 1).all():
-                    errors.append(f"Prediction probabilities are invalid: {column}")
+        errors.extend(validate_prediction_frame(predictions))
 
-    required_artifacts = [name.format(year=year) for name in CORE_RELEASE_FILES]
-    if require_full_audit:
-        required_artifacts.extend(AUDIT_RELEASE_FILES)
-    artifact_manifest = release_manifest.get("artifacts", {})
-    if not isinstance(artifact_manifest, dict):
-        errors.append("Release manifest artifacts must be an object")
-        artifact_manifest = {}
+    required_artifacts = required_release_artifacts(year, require_full_audit)
     for filename in required_artifacts:
         if not (results_dir / filename).exists():
             errors.append(f"Missing release artifact: results/{filename}")
         elif (results_dir / filename).stat().st_size == 0:
             errors.append(f"Empty release artifact: results/{filename}")
-
-    expected_artifacts = {
-        "prediction": f"results/{year}_predictions.csv",
-        "chart": f"results/predicted_vs_actual_{year}.png",
-        "report": f"results/f1_prediction_report_{year}.html",
-    }
-    for key, expected in expected_artifacts.items():
-        actual = _normalise_artifact_path(artifact_manifest.get(key))
-        if actual != expected:
-            errors.append(f"Release manifest artifact path mismatch: {key}")
-
-    if require_full_audit:
-        for filename in AUDIT_RELEASE_FILES:
-            key = AUDIT_ARTIFACT_KEYS[filename]
-            if (
-                _normalise_artifact_path(artifact_manifest.get(key))
-                != f"results/{filename}"
-            ):
-                errors.append(f"Release manifest is missing audit artifact: {filename}")
+    errors.extend(
+        validate_artifact_manifest_policy(release_manifest, year, require_full_audit)
+    )
 
     if reject_dirty_manifest and release_manifest_path.exists():
         if release_manifest.get("worktree_dirty") is True:
