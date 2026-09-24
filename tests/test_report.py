@@ -1,6 +1,7 @@
 import hashlib
 
 import pandas as pd
+import pytest
 
 from src import report
 
@@ -93,3 +94,27 @@ def test_create_report_renders_prediction_summary(tmp_path, monkeypatch):
     )
     report.create_report(2023)
     assert output_path.read_bytes() == first_report
+
+
+def test_failed_report_render_preserves_existing_report(tmp_path, monkeypatch):
+    monkeypatch.setattr(report, "RESULTS_DIR", tmp_path)
+    pd.DataFrame(
+        {
+            "Driver": ["Driver One"],
+            "Team": ["Team A"],
+            "Predicted Position": [1.0],
+            "Actual Position": [None],
+        }
+    ).to_csv(tmp_path / "2023_predictions.csv", index=False)
+    output_path = tmp_path / "existing-report.html"
+    output_path.write_bytes(b"previous complete report")
+
+    def fail_render(*_args, **_kwargs):
+        raise RuntimeError("synthetic render failure")
+
+    monkeypatch.setattr(report, "render_report", fail_render)
+
+    with pytest.raises(RuntimeError, match="synthetic render failure"):
+        report.create_report(2023, output_path=output_path)
+
+    assert output_path.read_bytes() == b"previous complete report"

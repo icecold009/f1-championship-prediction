@@ -105,6 +105,25 @@ def test_build_release_allow_dirty_records_manifest_state(tmp_path, monkeypatch)
     assert manifest["worktree_dirty"] is True
 
 
+def test_failed_manifest_write_preserves_previous_manifest(tmp_path, monkeypatch):
+    results_dir = _stub_build_release(monkeypatch, tmp_path)
+    results_dir.mkdir(parents=True)
+    manifest_path = results_dir / "release_manifest.json"
+    manifest_path.write_bytes(b"previous complete manifest")
+    monkeypatch.setattr(build_release, "_is_dirty_worktree", lambda: False)
+    monkeypatch.setattr(build_release, "_git_commit", lambda: "current-commit")
+
+    def fail_write(*_args, **_kwargs):
+        raise OSError("synthetic manifest write failure")
+
+    monkeypatch.setattr(build_release, "atomic_write_text", fail_write)
+
+    with pytest.raises(OSError, match="synthetic manifest write failure"):
+        build_release.build_release()
+
+    assert manifest_path.read_bytes() == b"previous complete manifest"
+
+
 def test_build_release_logs_prior_manifest_supersession(tmp_path, monkeypatch, caplog):
     results_dir = _stub_build_release(monkeypatch, tmp_path)
     results_dir.mkdir(parents=True)

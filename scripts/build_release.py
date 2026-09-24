@@ -20,6 +20,7 @@ from error_analysis import run_error_analysis
 from evaluate import run_evaluation
 from model_audit import run_model_audit
 
+from atomic_artifacts import atomic_write_text
 from data_processing import PROC_DIR, create_features, load_raw_data
 from model import train_model
 from predict import predict_championship
@@ -191,7 +192,7 @@ def build_release(
     if worktree_dirty:
         manifest["worktree_dirty"] = True
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    atomic_write_text(manifest_path, json.dumps(manifest, indent=2) + "\n")
 
     errors = validate_release(year=year, require_full_audit=full_audit)
     if errors:
