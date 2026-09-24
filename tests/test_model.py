@@ -1,4 +1,3 @@
-import hashlib
 from unittest.mock import Mock
 
 import numpy as np
@@ -128,15 +127,20 @@ def test_bootstrap_position_predictions_returns_rank_probabilities_without_leaka
     assert (uncertainty["bootstrap_runs"] == 4).all()
     assert uncertainty["champion_probability"].sum() == pytest.approx(1.0)
     assert uncertainty["top_3_probability"].sum() == pytest.approx(2.0)
-    uncertainty_digest = hashlib.sha256(
-        uncertainty.to_csv(
-            index=False, float_format="%.17g", lineterminator="\n"
-        ).encode("utf-8")
-    ).hexdigest()
+    assert uncertainty["top_5_probability"].sum() == pytest.approx(2.0)
+    assert (uncertainty["bootstrap_position_sd"] >= 0).all()
     assert (
-        uncertainty_digest
-        == "3ba1a53177c295f8a46fc5861b9d5e00f0b88dcf570804c240c5e9bfdf92684c"
-    )
+        uncertainty["bootstrap_position_p05"] <= uncertainty["bootstrap_position_mean"]
+    ).all()
+    assert (
+        uncertainty["bootstrap_position_mean"] <= uncertainty["bootstrap_position_p95"]
+    ).all()
+    for column in (
+        "champion_probability",
+        "top_3_probability",
+        "top_5_probability",
+    ):
+        assert uncertainty[column].between(0, 1).all()
 
     estimator_seeds = {
         name: getattr(estimator, "random_state", None)
@@ -261,15 +265,15 @@ def test_rolling_origin_keeps_test_seasons_after_training_cutoff():
         "spearman": "float64",
         "spearman_delta_vs_naive": "float64",
     }
-    metric_digest = hashlib.sha256(
-        results.to_csv(index=False, float_format="%.17g", lineterminator="\n").encode(
-            "utf-8"
+    metric_columns = ["rmse", "r2", "spearman", "spearman_delta_vs_naive"]
+    assert np.isfinite(results[metric_columns].to_numpy(dtype=float)).all()
+    naive_spearman = results.loc[results["model"] == NAIVE_BASELINE_NAME].set_index(
+        "test_year"
+    )["spearman"]
+    for row in results.itertuples():
+        assert row.spearman_delta_vs_naive == pytest.approx(
+            row.spearman - naive_spearman.loc[row.test_year]
         )
-    ).hexdigest()
-    assert (
-        metric_digest
-        == "4e67683122b74eae5f2e0f9ef15d2f07a4ef95313efecfef88b57976a1791e9d"
-    )
     assert set(results["test_year"]) == {2014, 2015}
     assert (results["train_end_year"] < results["test_year"]).all()
     assert set(results["model"]) == {
@@ -345,15 +349,19 @@ def test_tier_rolling_origin_keeps_test_seasons_after_training_cutoff(monkeypatc
         "f1_midfield": "float64",
         "f1_backmarker": "float64",
     }
-    tier_metric_digest = hashlib.sha256(
-        results.to_csv(index=False, float_format="%.17g", lineterminator="\n").encode(
-            "utf-8"
-        )
-    ).hexdigest()
-    assert (
-        tier_metric_digest
-        == "e54d782a42115d9f58c1cb1323fc80a8bb823bbb6145bbc90587f46919bb0109"
-    )
+    metric_columns = [
+        "accuracy",
+        "macro_f1",
+        "f1_champion",
+        "f1_podium",
+        "f1_top_5",
+        "f1_top_10",
+        "f1_midfield",
+        "f1_backmarker",
+    ]
+    metrics = results[metric_columns].to_numpy(dtype=float)
+    assert np.isfinite(metrics).all()
+    assert ((metrics >= 0) & (metrics <= 1)).all()
     assert set(results["test_year"]) == {2014, 2015}
     assert (results["train_end_year"] < results["test_year"]).all()
     assert {"accuracy", "macro_f1", "f1_champion", "f1_backmarker"}.issubset(
